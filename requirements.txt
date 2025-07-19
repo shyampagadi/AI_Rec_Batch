@@ -1,0 +1,48 @@
+# AWS
+boto3>=1.28.0
+botocore>=1.31.0
+
+# Document parsing
+pypdf>=3.15.0
+python-docx>=0.8.11
+python-pptx>=0.6.21
+tika>=1.24.0  # Cross-platform DOC parsing
+olefile>=0.46  # Used for DOC file parsing
+
+# PDF Processing
+pymupdf>=1.22.0  # PyMuPDF for robust PDF extraction
+pdf2image>=1.16.3
+pytesseract>=0.3.10
+Pillow>=9.0.0
+
+# Database connections
+psycopg2-binary>=2.9.6
+
+# OpenSearch
+opensearch-py
+
+requests-aws4auth>=1.1.1
+
+# Utilities
+python-dotenv>=1.0.0
+pandas>=2.0.0
+langchain>=0.0.267
+tqdm>=4.65.0
+retry>=0.9.2
+tenacity>=8.2.2
+concurrent-log-handler>=0.9.24
+pydantic>=2.0.0
+demjson3>=3.0.0
+colorama
+numpy>=1.21.0
+aws_requests_auth>=0.4.3
+
+# Document conversion
+docx2txt
+textract<1.6.0
+antiword
+
+# Typing
+typing-extensions>=4.0.0
+rich
+striprtf

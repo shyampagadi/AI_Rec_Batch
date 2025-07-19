@@ -1,0 +1,92 @@
+RESUME PARSER EXECUTION SUMMARY
+============================================================
+Date/Time: 2025-06-29 12:11:33
+Execution Time: 400.41 seconds
+
+OVERALL METRICS
+Total Files: 70
+Successfully Processed: 70
+Failed: 0
+Success Rate: 100.0%
+
+STORAGE METRICS
+Postgres: 70/70 (100.0%)
+Dynamodb: 70/70 (100.0%)
+
+CUSTOM METRICS
+Total Files Found: 70
+Total Processing Time: 397.94 seconds
+Processing Time (avg): 5.68 seconds per resume
+
+SUCCESSFULLY PROCESSED FILES
+1. Deepa E_4.0 Years_Java Developer_TechnoGen_Bengaluru.pdf -> 49d9ad08-8ba6-4e38-901d-23966d50cd4c
+2. Deepa E_4.0 Years_Java Developer_TechnoGen_Bengaluru (1).pdf -> 3ff2ca3a-aaf2-425d-b7c9-d06d69b547bd
+3. Gowtham S_3.10 Years_Java Developer_TechnoGen_Bengaluru.pdf -> 0b3d505d-fd3e-4ed4-a9a5-44a8c8171320
+4. AmitGupta_10.0 Years_Data Engineer Architect_Hyderabad.docx -> 8939ff63-adcd-48a7-a123-556f20f93746
+5. Deepak Kumar_4.1 Years_Java Developer_TechnoGen_Bengaluru (1).pdf -> ba7d3750-0a85-4b41-8f56-9517d84eb4c7
+6. Deepak Kumar_4.1 Years_Java Developer_TechnoGen_Bengaluru.pdf -> 3506714d-b046-46b6-9cad-cc100fa8eae7
+7. GudeLakshmanRao[8y_2m] (1).docx -> dfdffba5-95d6-48c3-afae-a6abde26ba69
+8. HIMANSHUGOYAL[8y_2m].pdf -> 4d947e92-e118-4d6c-b637-7a804e7a7475
+9. JansaidaShaik[8y_0m].pdf -> 6b63e676-4a19-453f-b2d7-34b05d0075f0
+10. AbhayTripathi_18+years_DataScienceConsulant (1).pdf -> ef85a774-75df-4ae7-b20c-981f79d44df2
+11. Kirtinaik_Resume.pdf -> e9411b93-20f1-478b-ad98-1ae5d0922491
+12. GudeLakshmanRao[8y_2m].docx -> 7599d76e-238b-48b1-9042-d20a0873a854
+13. Mangal Singh Sharma_7 Years_Performance Tester_Hyderabad (1).doc -> 584098e1-64d1-436f-a377-a85e449aef89
+14. Naukri_AKDENISHKAVYA[5y_0m].docx -> 7e94f377-7d78-4be5-aca5-34e63221d0e6
+15. Mangal Singh Sharma_7 Years_Performance Tester_Hyderabad.doc -> 5c104ac7-d2a4-4c64-98d7-b3407c909abf
+16. Naukri_BudidhaDhananjyayaSrinivas[5y_11m].docx -> 82976335-91c7-463a-8630-56dce9e66370
+17. Naukri_GuruprasadMK[4y_3m].pdf -> 19d62a3e-7dca-420f-b536-08534a7f4eaa
+18. Naukri_Brahmam[6y_1m].pdf -> 79ce827b-b629-4fd2-9bee-47f06f900ac6
+19. Naukri_DivyaJ[6y_0m].doc -> 210ad201-f247-4907-8952-cbcb6616a51d
+20. Naukri_Guna[10y_0m].pdf -> ef9e2505-75b3-4130-876b-4ed11b09bff5
+21. Naukri_InapakollaLakshmiPrasanna[8y_0m].pdf -> d4dfca39-8fad-4c71-a4a2-18baf142219b
+22. Naukri_KoustavGhosh[10y_1m].pdf -> f2dc3da4-96d6-4414-9cd4-3c70c2cd7334
+23. Naukri_KrishnaReddyThokala[14y_0m].docx -> 9767ad3d-588e-49e1-b78a-e73dedcfa504
+24. Naukri_Kutagollapallavi[6y_7m].pdf -> 9d1b3bd5-6a33-45be-9a83-ba2651088583
+25. Naukri_KumudaKamalraj[9y_0m].docx -> 2e5303b1-c63e-4a3a-bd9d-7d333db703e4
+26. Naukri_PadmaS[6y_0m] (1).docx -> 3aa8f4cb-2635-4f44-aa2a-94c7a7119c9f
+27. Naukri_PoojaRaghuwanshi[4y_4m].pdf -> 4946101d-8899-4935-a205-bc82f88b9376
+28. Naukri_MonalishaGoswami[9y_3m].doc -> ddba8fb2-1e98-45bb-879d-af201dfcaf4d
+29. Naukri_PavanKumar[7y_0m].docx -> 053f1c59-cf01-432c-85ed-b4f09b83f0b0
+30. Naukri_MoinKhan[5y_0m].pdf -> 5288fb81-bd6d-4682-a4dc-989f52bc37b7
+31. Naukri_MohanPoornaChand[6y_4m].docx -> 6b4150e1-ac3a-447b-8ab1-64403f1cd9cc
+32. Naukri_ParveenBegam[5y_6m].docx -> 164f4694-cf8f-4455-b72a-7d98c8549270
+33. Naukri_ManasaJyothiAmula[9y_0m].pdf -> 19233977-d550-4898-93f8-04e1a230222a
+34. Naukri_Pradeepkumar[9y_0m].pdf -> 6d032a57-c33f-40f8-9be4-4369c56d5f58
+35. Naukri_SHUBHAMBAREKAR[5y_0m].pdf -> dc3c08f3-f7b2-4104-8e40-f288ba81884a
+36. Naukri_RajeeshR[6y_6m].pdf -> 18fb4d11-d1ff-49d4-be2d-dcd959c9f1cd
+37. Naukri_RiteshShende[5y_3m].pdf -> efd360cb-5305-4689-92b0-935ecaad659f
+38. Naukri_Rishav[5y_11m].pdf -> 6da0a369-81ab-4b21-af45-209c9d4f2c8c
+39. Naukri_SabaleAkshay[8y_0m].pdf -> f23e4c4f-4178-4a7e-a45e-87f78ce5ac9d
+40. Naukri_SRIRAMBERA[6y_1m].pdf -> b9cb4077-3fea-47d7-8757-660ce8390652
+41. Naukri_SaiPrakashRayavarapu[5y_4m] (1).pdf -> 3d36ab7d-e1c4-40b4-8727-38254dd5992f
+42. Naukri_SaiPrakashRayavarapu[5y_4m].pdf -> 7900a72d-2a5c-488b-85db-38ea94936a55
+43. Naukri_SHILPAKONGARA[7y_0m].pdf -> 1982ff5c-cc15-4442-a834-30940174d263
+44. Naukri_SaravananS[5y_7m].pdf -> 8c16ff48-42df-4e2a-90bc-b206c505b4ef
+45. Naukri_SrinivasAvula[5y_1m].docx -> 17852bcb-0517-4733-a496-3c05d5c9ce61
+46. Naukri_ShruthiPadmanabha[6y_6m].pdf -> 47ebdda9-59f0-4fe4-a1b2-fc51c4fa585e
+47. Naukri_SupriyoKumarPattnaik[5y_6m].pdf -> 1d8f3075-96fb-4054-81bb-77c78a594848
+48. Naukri_Sonitha[7y_2m].docx -> 8bf914bc-0775-43e2-a400-41af768cfac4
+49. Naukri_ShivaRamanM[7y_0m].pdf -> 6d04d544-c83a-41cb-94bb-7a8968eb66c4
+50. Naukri_SwathiKolukuluri[5y_10m].docx -> 222ef150-b062-4e5b-980c-a047b57facc4
+51. Naukri_pujitha[5y_6m].docx -> 99f038e9-c9c1-495c-ab5d-6c42df889b42
+52. Naukri_Thulasireddy[5y_0m].docx -> f8f72a5d-0e53-40e3-9926-2dae644ec532
+53. Naukri_TejramReddyMV[5y_3m].docx -> e12c4c0e-a059-48d8-a800-9b6f0bb74f56
+54. Naukri_shanmuka[4y_4m].pdf -> 543b1d65-6e34-4e75-b31a-f9fa9785649d
+55. Naukri_Thanish[5y_3m].pdf -> 9ae6fb6f-2cc9-4009-b1c0-5c27ea43b85b
+56. Naukri_UtkarshShrivastava[6y_0m].pdf -> 82c8ac1d-a2bc-4f49-b9b7-6153fedd9fe0
+57. Naukri_VinodBingimalla[12y_0m].pdf -> 9cc56354-3aa4-4a01-99f9-a1a85043bf00
+58. ParthGaddam[9y_0m] (1).pdf -> 707787cc-9919-4143-9b00-2a89057d46d9
+59. SURIYA M.docx -> c489eaec-8fa8-4d3d-a35a-20217f8bb5dd
+60. RAJU KARANGULA_6.3 Years_Data Engineer Sr Associate_Hyderabad.docx -> 2f4a7aba-ad14-4253-95d4-2e0d8c8d7590
+61. PratimaRathore[8y_5m] (1).pdf -> 1ba170ae-355b-4709-a054-9566e9942296
+62. PratimaRathore[8y_5m].pdf -> 403854f7-3282-44b1-b00d-0affa1a44db4
+63. ParthGaddam[9y_0m].pdf -> a2dffc68-0b6f-482c-81a3-c3948158fc14
+64. Sujayendra Shashikumar- Trainer profile Bengaluru(rajesh reference) (1).docx -> 5ec70e93-66f3-4a4e-90fc-3092811019df
+65. Shaikshavali G_5.2 Years_Boomi Developer_Bangalore.docx -> d41960a6-8bd3-4bdc-919d-c09ddbd7ab7f
+66. Rathan Gunti -9.8 Years -IVR Developer - Hyderabad.docx -> a8b682bb-4344-428c-a354-323070493d68
+67. PravinSenta[11y_0m].pdf -> 17a0e5f7-ec2c-4c28-9583-3fd08c77e2c1
+68. Sahithi_Siripurapu_Updated_Resume.docx -> 9050e3b6-e52c-46d2-beee-7cfee796f7a3
+69. TrinadhMikkilineni_10.0 Years_Data Engineer Architect_Hyderabad.docx -> 70f3f73e-0e95-4150-951e-61d11b3fac10
+70. saitarunresume (2).pdf -> a70ae122-a41f-4f44-91aa-e4053e481b83
+============================================================

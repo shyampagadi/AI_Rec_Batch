@@ -1,0 +1,67 @@
+{
+  "resume_id": "b2a94992-249a-4f4f-95d8-2725e9797206",
+  "s3_key": "raw/Naukri_pujitha[5y_6m].docx",
+  "original_filename": "Naukri_pujitha[5y_6m].docx",
+  "file_type": "docx",
+  "llm_output": {
+    "resume_id": "b2a94992-249a-4f4f-95d8-2725e9797206",
+    "full_name": "Billa Sreepujitha",
+    "email": "pujithainfoetl@gmail.com",
+    "phone_number": "+91-9032944072",
+    "linkedin": "",
+    "address": "",
+    "summary": "Highly motivated ETL developer with 4+ years of experience in IICS, Informatica Power Center, and strong skills in Data Analysis, Data Requirement Analysis, and Data Mapping for ETL processes. Proficient in developing mappings in Informatica to load data from various sources into the Data Warehouse, using different transformations like Expression, Rank, Filter, Router, Joiner, Aggregator, Union, Lookup Connected & Unconnected, Sequence Generator, Sorter, Source Qualifier, Update Strategy.",
+    "skills": [
+      "IICS",
+      "Informatica Power Center",
+      "Data Analysis",
+      "Data Requirement Analysis",
+      "Data Mapping",
+      "ETL",
+      "Cloud",
+      "Oracle",
+      "Db2",
+      "SQL",
+      "Python",
+      "WinSCP",
+      "Putty"
+    ],
+    "positions": [
+      "Software Engineer",
+      "Associate_Projects"
+    ],
+    "companies": [
+      {
+        "name": "Accenture",
+        "duration": "Apr’2019 – Nov’2022",
+        "description": ""
+      },
+      {
+        "name": "Cognizant Technology Solutions India Private Limited",
+        "duration": "Dec' 2022 - Till now",
+        "description": ""
+      }
+    ],
+    "education": [
+      {
+        "degree": "",
+        "institution": "JNTU University",
+        "year": ""
+      }
+    ],
+    "certifications": [],
+    "achievements": [],
+    "industries": [
+      "Data warehousing",
+      "Software development"
+    ],
+    "opensearch_success": true,
+    "processing_time": 12.183003664016724,
+    "s3_key": "raw/Naukri_pujitha[5y_6m].docx",
+    "file_type": "docx",
+    "original_filename": "Naukri_pujitha[5y_6m].docx"
+  },
+  "timestamp": "2025-05-24 21:22:10",
+  "model_id": "meta.llama3-70b-instruct-v1:0",
+  "processing_time": 17.016000270843506
+}

@@ -1,0 +1,53 @@
+Job Title: Technology Solutions Architect
+Location: Hybrid (Remote/Onsite)
+Experience Required: 5-8 years
+Job Type: Full-Time
+
+About the Role:
+We are seeking a versatile Technology Solutions Architect to bridge our cloud infrastructure, customer experience platforms, and application development teams. The ideal candidate will have a diverse technology background spanning multiple domains including contact center technologies, cloud infrastructure, and software development practices. This role requires cross-functional expertise to design and implement comprehensive technical solutions for our enterprise clients.
+
+Key Responsibilities:
+- Design and implement scalable cloud-based architecture solutions
+- Integrate customer experience platforms with backend systems
+- Develop APIs and services to connect disparate technology stacks
+- Troubleshoot complex cross-platform technical issues
+- Collaborate with development teams to ensure solution feasibility
+- Lead technical discussions with clients and internal stakeholders
+- Evaluate new technologies and provide adoption recommendations
+- Optimize systems for performance, scalability and security
+- Create technical documentation and solution blueprints
+
+Required Skills & Experience:
+- Experience with both cloud infrastructure (AWS/Azure) and application development
+- Knowledge of API design patterns and integration methodologies
+- Understanding of contact center or customer experience technologies
+- Experience with database systems (SQL and NoSQL)
+- Proficiency in at least one programming language (Java, Python, JavaScript)
+- Familiarity with agile development methodologies
+- Experience with DevOps practices and CI/CD pipelines
+- Understanding of networking concepts and protocols
+- Knowledge of security best practices and compliance requirements
+
+Preferred Qualifications:
+- Experience with Genesys, Avaya, or similar contact center platforms
+- Certifications in cloud platforms (AWS Solution Architect, Azure Architect)
+- Experience with containerization technologies (Docker, Kubernetes)
+- Knowledge of data processing and analytics platforms
+- Experience with JavaScript frameworks (React, Angular)
+- Understanding of machine learning concepts and applications
+- Experience with test automation frameworks
+- Background in performance optimization and monitoring
+
+Soft Skills:
+- Strong problem-solving and analytical thinking
+- Excellent communication and presentation abilities
+- Ability to translate technical concepts for non-technical audiences
+- Collaborative mindset with strong leadership qualities
+- Adaptability and willingness to learn new technologies
+- Attention to detail and commitment to quality
+
+Why Join Us:
+- Opportunity to work with cutting-edge technologies across multiple domains
+- Collaborative environment that values innovation and creative problem-solving
+- Professional development opportunities including certifications and training
+- Competitive compensation package with comprehensive benefits 

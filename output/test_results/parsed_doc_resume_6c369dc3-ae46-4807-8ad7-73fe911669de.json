@@ -1,0 +1,100 @@
+{
+  "resume_id": "6c369dc3-ae46-4807-8ad7-73fe911669de",
+  "full_name": "Mangal Singh Sharma",
+  "name": "Mangal Singh Sharma",
+  "email": "mangalsingh.fp9864@gmail.com",
+  "phone_number": "+91 9985391803",
+  "address": "",
+  "linkedin": "",
+  "linkedin_url": null,
+  "summary": "Performance Test Engineer with 7 years of total experience. Expertise in performance testing, load testing. Expert at identifying performance bottlenecks and optimizing the system performance to ensure high-quality software delivery.Strong analytical and problem-solving skills with a track record of successful project completions.",
+  "total_experience": 7.0,
+  "skills": [
+    "LoadRunner",
+    "Apache JMeter",
+    "Grafana",
+    "AWS performance insights",
+    "cloudwatch",
+    "Dynatrace",
+    "Postgres",
+    "OracleDB",
+    "SOAP UI",
+    "Postman",
+    "Web HTTP/HTML",
+    "Web services",
+    "FTP",
+    "TruClient"
+  ],
+  "positions": [
+    "Performance Test Engineer"
+  ],
+  "companies": [
+    {
+      "name": "Amdocs",
+      "role": "Performance Test Engineer",
+      "description": "Conducted performance testing for various Amdocs products, ensuring optimal performance and scalability.",
+      "duration": "01/2022-12/2023",
+      "technologies": [
+        "LoadRunner",
+        "Web HTTP/HTML",
+        "Web services"
+      ]
+    },
+    {
+      "name": "Indigen Technologies",
+      "role": "Performance Test Engineer",
+      "description": "Involved in POC (Proof of Concept) for technical feasibility for tools and protocols.",
+      "duration": "01/2018-12/2021",
+      "technologies": [
+        "LoadRunner",
+        "Web HTTP/HTML",
+        "Web services",
+        "SOAP/REST",
+        "Ajax TruClient"
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "B.Tech",
+      "institution": "JNTU Hyderabad, Aurora Engineering College",
+      "year": 2016
+    }
+  ],
+  "certifications": [],
+  "projects": [
+    {
+      "name": "SVO (Service Orchestration) & SVA (Service Activation)",
+      "description": "Rapidly & accurately activate services over mobile, cable & wireline/IP networks",
+      "role": "Performance Test Engineer",
+      "metrics": "",
+      "technologies": [
+        "LoadRunner",
+        "SOAP UI",
+        "Postman",
+        "Grafana",
+        "AWS performance insights",
+        "cloudwatch"
+      ],
+      "duration_months": 0
+    },
+    {
+      "name": "ARM - Amdocs Resource Management",
+      "description": "Amdocs offers solutions for modernizing network inventory systems, including their Amdocs Resource Manager, to help service providers manage programmable networks and accelerate their transformation journeys, particularly for 5G and cloud-based networks.",
+      "role": "Performance Test Engineer",
+      "metrics": "",
+      "technologies": [
+        "LoadRunner",
+        "Grafana",
+        "Kibana insights",
+        "Dynatrace",
+        "openshift"
+      ],
+      "duration_months": 0
+    }
+  ],
+  "achievements": [],
+  "industries": [],
+  "opensearch_success": true,
+  "processing_time": 24.190337657928467
+}

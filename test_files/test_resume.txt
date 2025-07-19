@@ -1,0 +1,34 @@
+John Doe
+123 Main Street, New York, NY 10001
+john.doe@example.com
+(555) 123-4567
+LinkedIn: linkedin.com/in/johndoe
+
+SUMMARY
+Experienced software developer with 5+ years of experience in Python, AWS, and database technologies.
+
+EDUCATION
+Bachelor of Science in Computer Science
+New York University, 2015-2019
+
+EXPERIENCE
+Senior Software Developer
+ABC Tech, New York, NY
+2021-Present
+- Developed and maintained Python applications for data processing
+- Implemented AWS-based serverless architectures
+- Managed PostgreSQL databases
+
+Software Developer
+XYZ Solutions, New York, NY
+2019-2021
+- Built RESTful APIs using Flask and Django
+- Implemented CI/CD pipelines with GitHub Actions
+- Developed data extraction and processing pipelines
+
+SKILLS
+Programming Languages: Python, JavaScript, SQL
+Frameworks: Django, Flask, React
+Cloud: AWS (Lambda, S3, EC2, RDS)
+Databases: PostgreSQL, MongoDB, DynamoDB
+Other: Docker, Kubernetes, Git 

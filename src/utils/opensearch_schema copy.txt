@@ -1,0 +1,190 @@
+PUT /resume-embeddings
+{
+  "settings": {
+    "index": {
+      "knn": true,
+      "knn.algo_param.ef_search": 1024,
+      "analysis": {
+        "normalizer": {
+          "lowercase": {
+            "type": "custom",
+            "filter": ["lowercase"]
+          }
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "resume_text": {
+        "type": "object",
+        "properties": {
+          "raw": {
+            "type": "text",
+            "index": false
+          },
+          "structured": {
+            "type": "text"
+          },
+          "embedding": {
+            "type": "knn_vector",
+            "dimension": 1024,
+            "method": {
+              "name": "hnsw",
+              "engine": "nmslib",
+              "space_type": "cosinesimil",
+              "parameters": {
+                "ef_construction": 1024,
+                "m": 48
+              }
+            }
+          }
+        }
+      },
+      "summary": {
+        "type": "text",
+        "fields": {
+          "embedding": {
+            "type": "knn_vector",
+            "dimension": 512
+          }
+        }
+      },
+      "total_experience": {
+        "type": "float"
+      },
+      "positions": {
+        "type": "keyword",
+        "fields": {
+          "embedding": {
+            "type": "knn_vector",
+            "dimension": 256
+          }
+        }
+      },
+      "companies": {
+        "type": "nested",
+        "properties": {
+          "name": {"type": "keyword"},
+          "duration": {"type": "text"},
+          "description": {
+            "type": "text",
+            "fields": {
+              "embedding": {
+                "type": "knn_vector",
+                "dimension": 512
+              }
+            }
+          },
+          "industry": {
+            "type": "keyword",
+            "fields": {
+              "embedding": {
+                "type": "knn_vector",
+                "dimension": 128
+              }
+            }
+          }
+        }
+      },
+      "projects": {
+        "type": "nested",
+        "properties": {
+          "name": {"type": "text"},
+          "description": {
+            "type": "text",
+            "fields": {
+              "embedding": {
+                "type": "knn_vector",
+                "dimension": 512
+              }
+            }
+          },
+          "technologies": {
+            "type": "keyword",
+            "fields": {
+              "embedding": {
+                "type": "knn_vector",
+                "dimension": 256
+              }
+            }
+          }
+        }
+      },
+      "education": {
+        "type": "nested",
+        "properties": {
+          "degree": {
+            "type": "text",
+            "fields": {
+              "embedding": {
+                "type": "knn_vector",
+                "dimension": 256
+              }
+            }
+          },
+          "institution": {"type": "keyword"},
+          "year": {"type": "short"}
+        }
+      },
+      "skills": {
+        "type": "keyword",
+        "normalizer": "lowercase",
+        "fields": {
+          "embedding": {
+            "type": "knn_vector",
+            "dimension": 256
+          }
+        }
+      },
+      "industries": {
+        "type": "keyword",
+        "fields": {
+          "embedding": {
+            "type": "knn_vector",
+            "dimension": 128
+          }
+        }
+      },
+      "achievements": {
+        "type": "nested",
+        "properties": {
+          "company": {"type": "keyword"},
+          "description": {
+            "type": "text",
+            "fields": {
+              "embedding": {
+                "type": "knn_vector",
+                "dimension": 512
+              }
+            }
+          },
+          "category": {"type": "keyword"}
+        }
+      },
+      "certifications": {
+        "type": "keyword",
+        "fields": {
+          "embedding": {
+            "type": "knn_vector",
+            "dimension": 256
+          }
+        }
+      },
+      "collection_name": {
+        "type": "keyword"
+      },
+      "created_dt": {
+        "type": "date",
+        "format": "strict_date_optional_time_nanos"
+      },
+      "updated_dt": {
+        "type": "date",
+        "format": "strict_date_optional_time_nanos"
+      }
+    }
+  }
+}
+
+
+ 

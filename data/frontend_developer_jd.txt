@@ -1,0 +1,59 @@
+# Senior Frontend Developer
+
+## About the Role
+We are looking for a talented Senior Frontend Developer to join our engineering team. In this role, you will build and maintain user interfaces for our web applications, focusing on creating responsive, accessible, and high-performance user experiences.
+
+## Required Experience
+- 4+ years of professional experience in frontend development
+- Strong proficiency with modern JavaScript frameworks (React preferred)
+- Experience with state management solutions (Redux, Context API, MobX)
+- Knowledge of modern CSS practices, including Flexbox, Grid, and CSS-in-JS
+- Understanding of web performance optimization techniques
+
+## Required Skills
+- JavaScript (ES6+)
+- TypeScript
+- React
+- HTML5
+- CSS3/Sass
+- Webpack/Vite
+- Git
+- Jest/RTL
+- Responsive Design
+- REST APIs
+
+## Nice-to-Have Skills
+- Experience with Next.js or other React-based frameworks
+- Knowledge of GraphQL and Apollo Client
+- Familiarity with server-side rendering and static site generation
+- Experience with design systems and component libraries
+- Understanding of accessibility standards (WCAG)
+- Performance monitoring and optimization tools
+- Experience with mobile app development (React Native)
+
+## Responsibilities
+- Develop and maintain frontend components and features for web applications
+- Collaborate with designers to implement UI designs with pixel-perfect accuracy
+- Write clean, maintainable, and well-tested code
+- Optimize applications for maximum speed and scalability
+- Stay current with emerging frontend technologies and best practices
+- Participate in code reviews and mentor junior developers
+- Work with backend teams to integrate APIs and services
+
+## Qualifications
+- Bachelor's degree in Computer Science or related field (or equivalent experience)
+- Portfolio demonstrating frontend development skills
+- Excellent problem-solving abilities
+- Strong communication and collaboration skills
+- Ability to work in a fast-paced environment
+
+## Seniority Level
+Senior
+
+## Job Type
+Full-time, Hybrid
+
+## Industry
+Technology, Software Development
+
+Our company offers competitive compensation, comprehensive benefits, and opportunities for professional growth. We foster an inclusive environment where diverse perspectives are valued and encouraged. 

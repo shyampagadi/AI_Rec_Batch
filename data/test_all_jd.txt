@@ -1,0 +1,53 @@
+
+# Job Description: Senior Data Engineering Architect
+
+**Location:** Hybrid (Bangalore/Hyderabad)
+
+**Company:** TechInnovate Solutions
+
+## About the Role
+
+We are seeking an experienced **Senior Data Engineering Architect** to join our growing team. The ideal candidate will have strong expertise in designing and implementing scalable data solutions using cloud technologies, with a focus on AWS services. This role will be responsible for architecting, developing, and optimizing our data infrastructure to support our AI and machine learning initiatives.
+
+## Key Responsibilities
+
+- Design and develop robust, scalable data pipelines and ETL processes using PySpark, AWS EMR, and other Big Data technologies
+- Lead the migration of existing data platforms from on-premises to cloud environments
+- Implement data storage solutions using various databases including Snowflake, PostgreSQL, and NoSQL databases
+- Architect and develop microservices for data processing using Java/Spring Boot
+- Establish best practices for data quality, security, and governance
+- Collaborate with data scientists and ML engineers to build data platforms that support AI/ML workloads
+- Mentor junior engineers and provide technical leadership to the team
+
+## Required Skills & Experience
+
+- 8+ years of experience in data engineering or similar roles
+- Strong expertise in AWS cloud services (EMR, Lambda, S3, RDS)
+- Proficiency in PySpark, SQL, and Python for large-scale data processing
+- Experience with Snowflake and other modern data warehouse solutions
+- Knowledge of microservices architecture and containerization (Docker, Kubernetes)
+- Familiarity with real-time data processing technologies (Kafka)
+- Bachelor's or Master's degree in Computer Science, Engineering or a related field
+
+## Preferred Qualifications
+
+- Experience with AI/ML technologies including LangChain, OpenAI, and vector databases (ChromaDB)
+- Certifications such as AWS Solutions Architect or SnowPro Core
+- Experience with data visualization tools (Power BI, Tableau)
+- Knowledge of DevOps practices and CI/CD pipelines
+- Experience in financial services, healthcare, or e-commerce industries
+- Track record of improving system performance and reducing operational costs
+
+## What We Offer
+
+- Competitive salary package with performance bonuses
+- Opportunity to work with cutting-edge technologies
+- Professional development and certification support
+- Flexible work arrangements with hybrid options
+- Health and wellness benefits
+- Collaborative and innovative team environment
+
+This is a unique opportunity to make a significant impact in a fast-growing technology company that values innovation and technical excellence. If you have a passion for designing scalable data solutions and want to work with a talented team pushing the boundaries of what's possible with data, we want to hear from you!
+
+**Job ID:** DE-ARCH-2025-06
+**Apply by:** July 15, 2025

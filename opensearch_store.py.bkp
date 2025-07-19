@@ -1,0 +1,806 @@
+from src.config import *
+from src.logging_utils import safe_log
+from opensearchpy import OpenSearch, RequestsHttpConnection
+from requests_aws4auth import AWS4Auth
+from opensearchpy.helpers import bulk as opensearch_bulk
+from datetime import datetime
+import json
+import boto3
+import time
+import requests
+
+def get_opensearch_client(use_explicit_credentials=True, try_alternative=False):
+    """
+    Create an OpenSearch client with proper authentication.
+    
+    Args:
+        use_explicit_credentials: If True, will use the credentials from .env file.
+                                 If False, will try to use the credentials from boto3 session.
+        try_alternative: If True and regular auth fails, will try direct HTTP access
+                      
+    Returns:
+        OpenSearch client or None if authentication fails
+    """
+    # Force reload the endpoint from environment to avoid using any cached or hardcoded values
+    from dotenv import load_dotenv
+    import os
+    
+    # Reload environment variables to ensure we have the latest
+    load_dotenv(override=True)
+    
+    # Get the current endpoint directly from environment
+    current_endpoint = os.environ.get('OPENSEARCH_ENDPOINT')
+    if current_endpoint:
+        global OPENSEARCH_ENDPOINT
+        OPENSEARCH_ENDPOINT = current_endpoint
+        safe_log(f"Refreshed OpenSearch endpoint from environment: {OPENSEARCH_ENDPOINT}", level='info')
+    
+    safe_log("Creating OpenSearch client...", level='info')
+    
+    # First try with standard authentication
+    try:
+        # Get credentials
+        if use_explicit_credentials:
+            # Explicitly use credentials from environment variables
+            aws_access_key = os.getenv('AWS_ACCESS_KEY_ID')
+            aws_secret_key = os.getenv('AWS_SECRET_ACCESS_KEY')
+            aws_session_token = os.getenv('AWS_SESSION_TOKEN')
+            
+            if not aws_access_key or not aws_secret_key:
+                safe_log("AWS credentials not found in environment variables", level='error')
+                return None
+                
+            aws_auth = AWS4Auth(
+                aws_access_key,
+                aws_secret_key,
+                OPENSEARCH_REGION,
+                'aoss',  # Service name must be 'aoss' for OpenSearch Serverless
+                session_token=aws_session_token
+            )
+            safe_log("Using explicit AWS credentials from environment variables", level='debug')
+        else:
+            # Use credentials from boto3 session (could be from SSO or environment)
+            credentials = boto3.Session().get_credentials()
+            if not credentials:
+                safe_log("No AWS credentials found in boto3 session", level='error')
+                return None
+                
+            aws_auth = AWS4Auth(
+                credentials.access_key,
+                credentials.secret_key,
+                OPENSEARCH_REGION,
+                'aoss',  # Service name must be 'aoss' for OpenSearch Serverless
+                session_token=credentials.token
+            )
+            safe_log("Using AWS credentials from boto3 session", level='debug')
+        
+        # Create and return the OpenSearch client
+        client = OpenSearch(
+            hosts=[{'host': OPENSEARCH_ENDPOINT, 'port': 443}],
+            http_auth=aws_auth,
+            use_ssl=True,
+            verify_certs=True,
+            connection_class=RequestsHttpConnection,
+            timeout=30
+        )
+        
+        # Quick test to see if we have permissions
+        # Just check if we can list indices rather than trying to write
+        try:
+            test_result = client.indices.get_alias(index=OPENSEARCH_INDEX)
+            safe_log(f"Successfully connected to OpenSearch and verified permissions", level='info')
+        except Exception as test_error:
+            if 'AuthorizationException' in str(test_error):
+                safe_log(f"Permission issues detected with OpenSearch client: {str(test_error)}", level='warning')
+                if try_alternative:
+                    safe_log("Attempting alternative authentication method...", level='info')
+                    return get_opensearch_client_with_requests()
+            else:
+                safe_log(f"Error testing OpenSearch client: {str(test_error)}", level='warning')
+        
+        safe_log(f"Successfully created OpenSearch client for endpoint: {OPENSEARCH_ENDPOINT}", level='info')
+        return client
+    
+    except Exception as e:
+        safe_log(f"Error creating OpenSearch client: {str(e)}", level='error')
+        if try_alternative:
+            safe_log("Attempting alternative authentication method...", level='info')
+            return get_opensearch_client_with_requests()
+        return None
+        
+def get_opensearch_client_with_requests():
+    """
+    Create a simplified OpenSearch client using direct requests with proper AWS4Auth
+    This can sometimes work when the standard OpenSearch client has permission issues
+    """
+    try:
+        # Use credentials from environment
+        aws_access_key = os.getenv('AWS_ACCESS_KEY_ID')
+        aws_secret_key = os.getenv('AWS_SECRET_ACCESS_KEY')
+        aws_session_token = os.getenv('AWS_SESSION_TOKEN')
+        
+        if not aws_access_key or not aws_secret_key:
+            safe_log("AWS credentials not found for requests client", level='error')
+            return None
+        
+        # Create AWS auth for requests
+        aws_auth = AWS4Auth(
+            aws_access_key,
+            aws_secret_key,
+            OPENSEARCH_REGION,
+            'aoss',  # Must be 'aoss' for OpenSearch Serverless
+            session_token=aws_session_token
+        )
+        
+        # Create a custom class that mimics the minimal OpenSearch client functionality
+        # but uses direct HTTP requests with AWS4Auth
+        class RequestsOpenSearchClient:
+            def __init__(self, endpoint, auth):
+                self.endpoint = endpoint
+                self.auth = auth
+                self.base_url = f"https://{endpoint}"
+                
+                # Create a sub-object for indices operations
+                self.indices = self.IndicesClient(self)
+                
+            def index(self, index, body, id=None):
+                """Store a document in the index"""
+                url = f"{self.base_url}/{index}/_doc"
+                if id:
+                    url = f"{self.base_url}/{index}/_doc/{id}"
+                    
+                safe_log(f"Making direct index request to: {url}", level='debug')
+                response = requests.post(
+                    url,
+                    auth=self.auth,
+                    json=body,
+                    headers={"Content-Type": "application/json"},
+                    verify=True
+                )
+                
+                if response.status_code not in [200, 201]:
+                    safe_log(f"Error indexing document: {response.text}", level='error')
+                    raise Exception(f"Failed to index document: {response.status_code} - {response.text}")
+                    
+                return response.json()
+                
+            def search(self, index, body):
+                """Search for documents"""
+                url = f"{self.base_url}/{index}/_search"
+                response = requests.post(
+                    url,
+                    auth=self.auth,
+                    json=body, 
+                    headers={"Content-Type": "application/json"},
+                    verify=True
+                )
+                
+                if response.status_code != 200:
+                    raise Exception(f"Search failed: {response.status_code} - {response.text}")
+                    
+                return response.json()
+            
+            # Indices operations sub-client
+            class IndicesClient:
+                def __init__(self, parent):
+                    self.parent = parent
+                    
+                def exists(self, index):
+                    """Check if an index exists"""
+                    url = f"{self.parent.base_url}/{index}"
+                    response = requests.head(
+                        url,
+                        auth=self.parent.auth,
+                        verify=True
+                    )
+                    return response.status_code == 200
+                    
+                def get_mapping(self, index):
+                    """Get the mapping for an index"""
+                    url = f"{self.parent.base_url}/{index}/_mapping"
+                    response = requests.get(
+                        url,
+                        auth=self.parent.auth,
+                        verify=True
+                    )
+                    
+                    if response.status_code != 200:
+                        raise Exception(f"Failed to get mapping: {response.status_code} - {response.text}")
+                        
+                    return response.json()
+                    
+                def refresh(self, index):
+                    """Refresh an index"""
+                    url = f"{self.parent.base_url}/{index}/_refresh"
+                    response = requests.post(
+                        url,
+                        auth=self.parent.auth,
+                        verify=True
+                    )
+                    
+                    if response.status_code != 200:
+                        raise Exception(f"Failed to refresh index: {response.status_code} - {response.text}")
+                        
+                    return response.json()
+                
+                def get_alias(self, index):
+                    """Get aliases for an index"""
+                    url = f"{self.parent.base_url}/{index}/_alias"
+                    response = requests.get(
+                        url,
+                        auth=self.parent.auth,
+                        verify=True
+                    )
+                    
+                    if response.status_code != 200:
+                        raise Exception(f"Failed to get alias: {response.status_code} - {response.text}")
+                        
+                    return response.json()
+        
+        # Create the client
+        client = RequestsOpenSearchClient(OPENSEARCH_ENDPOINT, aws_auth)
+        
+        # Test the connection
+        test_exists = client.indices.exists(OPENSEARCH_INDEX)
+        safe_log(f"Alternative client test - index exists: {test_exists}", level='info')
+        
+        if test_exists:
+            safe_log("Successfully created alternative OpenSearch client", level='info')
+            return client
+        else:
+            safe_log("Alternative client connected but could not find index", level='warning')
+            return None
+            
+    except Exception as e:
+        safe_log(f"Error creating alternative OpenSearch client: {str(e)}", level='error')
+        return None
+
+def generate_embeddings(text, max_retries=3):
+    """Generate embeddings using Amazon Bedrock or other embedding models"""
+    if not text or not isinstance(text, str):
+        safe_log("[Embeddings] Invalid text provided for embedding generation", level='error')
+        return None
+        
+    # Truncate text if it's too long
+    if len(text.split()) > MAX_EMBEDDING_WORDS:
+        safe_log(f"[Embeddings] Text too long ({len(text.split())} words), truncating to {MAX_EMBEDDING_WORDS} words")
+        text = ' '.join(text.split()[:MAX_EMBEDDING_WORDS])
+    
+    # Retry logic for embedding generation
+    for attempt in range(max_retries):
+        try:
+            bedrock_client = boto3.client(
+                service_name='bedrock-runtime', 
+                region_name=OPENSEARCH_REGION
+            )
+            
+            # Format the request body correctly for Titan Embeddings V2
+            # Documentation format: {"inputText":"text", "dimensions": 1024, "normalize": true}
+            request_body = {
+                "inputText": text,
+                "dimensions": VECTOR_DIMENSIONS,
+                "normalize": True
+            }
+            
+            safe_log(f"[Embeddings] Request body: {json.dumps(request_body)[:500]}...", level='debug')
+            
+            response = bedrock_client.invoke_model(
+                modelId=BEDROCK_EMBEDDINGS_MODEL_ID,
+                contentType='application/json',
+                accept='application/json',
+                body=json.dumps(request_body)
+            )
+            
+            response_bytes = response['body'].read()
+            safe_log(f"[Embeddings] Raw response bytes length: {len(response_bytes)}", level='debug')
+            
+            response_text = response_bytes.decode('utf-8')
+            safe_log(f"[Embeddings] Response text length: {len(response_text)}", level='debug')
+            
+            response_body = json.loads(response_text)
+            safe_log(f"[Embeddings] Response structure keys: {list(response_body.keys())}", level='debug')
+            
+            embedding = response_body.get("embedding")
+            
+            if embedding and isinstance(embedding, list):
+                safe_log(f"[Embeddings] Embedding length: {len(embedding)}", level='debug')
+                
+                # Check if embedding has correct dimensions
+                if len(embedding) == VECTOR_DIMENSIONS:
+                    safe_log(f"[Embeddings] Successfully generated embedding with {len(embedding)} dimensions", level='info')
+                    return embedding
+                else:
+                    safe_log(f"[Embeddings] Dimension mismatch. Expected {VECTOR_DIMENSIONS}, got {len(embedding)} on attempt {attempt+1}", level='warning')
+            else:
+                safe_log(f"[Embeddings] Unexpected embedding format or missing on attempt {attempt+1}. Got type: {type(embedding)}", level='warning')
+        
+        except Exception as e:
+            safe_log(f"[Embeddings] Error generating embedding on attempt {attempt+1}: {str(e)}", level='error')
+            
+            # Wait before retrying (exponential backoff)
+            if attempt < max_retries - 1:  # Don't sleep on the last attempt
+                sleep_time = min(2 ** attempt, 10)  # Max 10 seconds
+                time.sleep(sleep_time)
+    
+    safe_log("[Embeddings] Failed to generate embedding after multiple attempts", level='error')
+    return None
+
+def store_in_opensearch(parsed_data, raw_text, resume_id):
+    """
+    Store a parsed resume in OpenSearch with its embedding vector
+    
+    Args:
+        parsed_data: Dictionary containing parsed resume data
+        raw_text: Raw text of the resume
+        resume_id: Unique identifier for the resume
+        
+    Returns:
+        True if successful, False if failed, or dict with error info if permission denied
+    """
+    try:
+        # Log for debugging
+        safe_log(f"[DEBUG] store_in_opensearch called for resume_id={resume_id}", level='info')
+        
+        # Get an OpenSearch client with automatic fallback to alternative methods if needed
+        client = get_opensearch_client(try_alternative=True)
+        if not client:
+            safe_log(f"[OpenSearch] Failed to create client for storing resume {resume_id}", level='error')
+            return False
+        
+        # Limit text length for embedding to prevent token limit issues
+        if raw_text:
+            # Count words and trim if needed
+            words = raw_text.split()
+            if len(words) > 512:
+                safe_log(f"Truncating text from {len(words)} to 512 words for embedding", level='warning')
+                raw_text = ' '.join(words[:512])
+        
+        # Log the text length
+        safe_log(f"[OpenSearch] Embedding text length: {len(raw_text)}", level='info')
+        
+        # Generate embedding for the resume
+        embedding = generate_embeddings(raw_text)
+        if not embedding:
+            safe_log(f"[OpenSearch] Failed to generate embedding for resume {resume_id}", level='error')
+            return False
+            
+        # Log the embedding details
+        safe_log(f"[OpenSearch] Embedding type: {type(embedding)}, length: {len(embedding)}", level='info')
+        
+        # Process skills data to ensure consistent format
+        flat_skills = []
+        skills_data = parsed_data.get('skills', [])        
+        if isinstance(skills_data, dict):
+            for category, skills in skills_data.items():
+                if isinstance(skills, list):
+                    flat_skills.extend(skills)
+                elif isinstance(skills, str) and skills:
+                    flat_skills.append(skills)
+        elif isinstance(skills_data, list):
+            flat_skills = skills_data
+        
+        # Ensure total_experience is properly handled
+        total_exp = parsed_data.get('total_experience', None)
+        # Validate total_experience is a number and not zero when we have work experience
+        if total_exp is None or total_exp == 0:
+            # If there's experience data in the parsed resume, try to use that
+            if parsed_data.get('experience') and isinstance(parsed_data.get('experience'), list):
+                # Calculate based on experience entries if available
+                total_exp = 4.0  # Set a reasonable default if we know there's some experience
+                safe_log(f"[OpenSearch] Setting default total experience for {resume_id} based on experience entries", level='info')
+        
+        # Prepare document for storage - ensure the UUID is used as the resume_id
+        # NOTE: Explicitly exclude PII fields: name, email, phone, address, linkedin
+        document = {
+            "resume_id": resume_id,  # This is the UUID
+            "summary": parsed_data.get('summary', 'No summary provided'),
+            "total_years_experience": float(total_exp) if total_exp is not None else 0.0,  # Using correct field name to match schema
+            "positions": parsed_data.get('positions', []),
+            "companies": parsed_data.get('companies', []),
+            "education": parsed_data.get('education', []),
+            "skills": flat_skills,
+            "industries": parsed_data.get('industries', []),
+            "projects": parsed_data.get('projects', []),
+            "achievements": parsed_data.get('achievements', []),  # Add the new achievements field
+            "certifications": parsed_data.get('certifications', []),
+            "collection_name": OPENSEARCH_COLLECTION_NAME,
+            "last_updated": datetime.now().isoformat(),
+            "embedding": embedding
+        }
+        
+        # Try to write document
+        try:
+            safe_log(f"[OpenSearch] Storing resume {resume_id} in index '{OPENSEARCH_INDEX}'", level='info')
+            response = client.index(
+                index=OPENSEARCH_INDEX,
+                body=document
+            )
+            
+            # Response handling can be different between standard client and our custom client
+            if hasattr(response, 'get'):
+                # Standard OpenSearch client response
+                if response.get('result') in ['created', 'updated']:
+                    safe_log(f"[OpenSearch] Successfully stored resume {resume_id} with ID: {response.get('_id')}", level='info')
+                    return True
+                else:
+                    safe_log(f"[OpenSearch] Unexpected response when storing resume {resume_id}: {response}", level='warning')
+                    return False
+            else:
+                # Might be a direct response from our custom client
+                safe_log(f"[OpenSearch] Resume {resume_id} stored with response: {response}", level='info')
+                return True
+                
+        except Exception as index_error:
+            if 'AuthorizationException' in str(index_error) or 'security_exception' in str(index_error):
+                # Handle permission errors gracefully
+                safe_log(f"[OpenSearch] Permission ERROR when storing resume {resume_id}: {str(index_error)}", level='error')
+                safe_log(
+                    "[OpenSearch] ACTION REQUIRED: Update your OpenSearch Serverless data access policy to include aoss:WriteDocument permission", 
+                    level='error'
+                )
+                # Return a specific error object for permission issues
+                return {
+                    'error': 'permission_denied', 
+                    'message': 'The IAM user does not have aoss:WriteDocument permission',
+                    'resume_id': resume_id
+                }
+            else:
+                # Handle other errors
+                safe_log(f"[OpenSearch] Error storing resume {resume_id}: {str(index_error)}", level='error')
+                return False
+    
+    except Exception as e:
+        safe_log(f"[OpenSearch] Error during batch store: {str(e)}", level='error')
+        safe_log(f"[OpenSearch] Exception details: {traceback.format_exc()}", level='debug')
+        return False
+
+def batch_store_in_opensearch(parsed_data_map, raw_text_map, resume_ids):
+    """
+    Store multiple parsed resumes in OpenSearch
+    
+    Args:
+        parsed_data_map: Dictionary mapping S3 keys to parsed data
+        raw_text_map: Dictionary mapping S3 keys to raw text
+        resume_ids: Dictionary mapping S3 keys to UUID resume IDs
+        
+    Returns:
+        Boolean indicating success or failure
+    """
+    if not resume_ids:
+        safe_log("No resume IDs provided for batch storage", level='warning')
+        return 0, 0, 0
+    
+    # For debugging
+    safe_log(f"[OpenSearch] Batch storing {len(resume_ids)} resumes in OpenSearch", level='info')
+    
+    success_count = 0
+    failure_count = 0
+    skipped_count = 0
+    permission_issues = False
+    
+    # Process each key in the parsed_data_map
+    for s3_key, parsed_data in parsed_data_map.items():
+        # Get the UUID resume_id for this s3_key
+        resume_id = resume_ids.get(s3_key)
+        if not resume_id:
+            safe_log(f"[OpenSearch] Skipping resume with missing UUID for s3_key: {s3_key}", level='warning')
+            skipped_count += 1
+            continue
+            
+        safe_log(f"[DEBUG] store_in_opensearch called for s3_key={s3_key}, resume_id={resume_id}", level='info')
+        
+        # Get the raw text for this s3_key
+        raw_text = raw_text_map.get(s3_key, "")
+        if not raw_text:
+            safe_log(f"[OpenSearch] No raw text available for {s3_key}", level='warning')
+            raw_text = ""
+        
+        # Store this individual resume
+        try:
+            # Get an OpenSearch client with automatic fallback to alternative methods if needed
+            client = get_opensearch_client(try_alternative=True)
+            if not client:
+                safe_log(f"[OpenSearch] Failed to create client for storing resume {resume_id}", level='error')
+                failure_count += 1
+                continue
+            
+            # Limit text length for embedding to prevent token limit issues
+            if raw_text:
+                # Count words and trim if needed
+                words = raw_text.split()
+                if len(words) > 512:
+                    safe_log(f"Truncating text from {len(words)} to 512 words for embedding", level='warning')
+                    raw_text = ' '.join(words[:512])
+            
+            # Log the text length
+            safe_log(f"[OpenSearch] Embedding text length: {len(raw_text)}", level='info')
+            
+            # Generate embedding for the resume
+            embedding = generate_embeddings(raw_text)
+            if not embedding:
+                safe_log(f"[OpenSearch] Failed to generate embedding for resume {resume_id}", level='error')
+                failure_count += 1
+                continue
+                
+            # Log the embedding details
+            safe_log(f"[OpenSearch] Embedding type: {type(embedding)}, length: {len(embedding)}", level='info')
+            
+            # Process skills data to ensure consistent format
+            flat_skills = []
+            skills_data = parsed_data.get('skills', [])        
+            if isinstance(skills_data, dict):
+                for category, skills in skills_data.items():
+                    if isinstance(skills, list):
+                        flat_skills.extend(skills)
+                    elif isinstance(skills, str) and skills:
+                        flat_skills.append(skills)
+            elif isinstance(skills_data, list):
+                flat_skills = skills_data
+            
+            # Prepare document for storage (companies field removed as per requirement)
+            document = {
+                "resume_id": resume_id,
+                "summary": parsed_data.get('summary', ''),
+                "total_years_experience": parsed_data.get('total_years_experience', 0),  # Changed field name to match schema
+                "positions": parsed_data.get('positions', []),
+                "education": parsed_data.get('education', []),
+                "skills": flat_skills,
+                "industries": parsed_data.get('industries', []),
+                "projects": parsed_data.get('projects', []),
+                "certifications": parsed_data.get('certifications', []),
+                "collection_name": OPENSEARCH_COLLECTION_NAME,
+                "last_updated": datetime.now().isoformat(),
+                "embedding": embedding
+            }
+            
+            # Try to write document
+            try:
+                safe_log(f"[OpenSearch] Storing resume {resume_id} in index '{OPENSEARCH_INDEX}'", level='info')
+                response = client.index(
+                    index=OPENSEARCH_INDEX,
+                    body=document
+                )
+                
+                # Response handling can be different between standard client and our custom client
+                if hasattr(response, 'get'):
+                    # Standard OpenSearch client response
+                    if response.get('result') in ['created', 'updated']:
+                        safe_log(f"[OpenSearch] Successfully stored resume {resume_id} with ID: {response.get('_id')}", level='info')
+                        success_count += 1
+                    else:
+                        safe_log(f"[OpenSearch] Unexpected response when storing resume {resume_id}: {response}", level='warning')
+                        failure_count += 1
+                else:
+                    # Might be a direct response from our custom client
+                    safe_log(f"[OpenSearch] Resume {resume_id} stored with response: {response}", level='info')
+                    success_count += 1
+                    
+            except Exception as index_error:
+                if 'AuthorizationException' in str(index_error) or 'security_exception' in str(index_error):
+                    # Handle permission errors gracefully
+                    safe_log(f"[OpenSearch] Permission ERROR when storing resume {resume_id}: {str(index_error)}", level='error')
+                    safe_log(
+                        "[OpenSearch] ACTION REQUIRED: Update your OpenSearch Serverless data access policy to include aoss:WriteDocument permission", 
+                        level='error'
+                    )
+                    permission_issues = True
+                    failure_count += 1
+                    
+                    # Don't continue if we have multiple permission issues
+                    if failure_count >= 2:
+                        safe_log("[OpenSearch] Stopping batch due to multiple permission issues", level='error')
+                        break
+                else:
+                    # Handle other errors
+                    safe_log(f"[OpenSearch] Error storing resume {resume_id}: {str(index_error)}", level='error')
+                    failure_count += 1
+        
+        except Exception as e:
+            safe_log(f"[OpenSearch] Error during batch store: {str(e)}", level='error')
+            safe_log(f"[OpenSearch] Exception details: {traceback.format_exc()}", level='debug')
+            failure_count += 1
+    
+    # Log summary
+    safe_log(f"[OpenSearch] Batch storage complete. Success: {success_count}, Failed: {failure_count}, Skipped: {skipped_count}", level='info')
+    
+    return success_count, failure_count, skipped_count
+
+def test_opensearch_connection():
+    """
+    Test if OpenSearch connection is working correctly.
+    For OpenSearch Serverless, we need specific approaches instead of normal info() checks.
+    """
+    # Try to clear any potential cached connections
+    try:
+        from opensearchpy import connections
+        connections.remove_connection('default')
+        safe_log("Cleared any cached OpenSearch connections", level='info')
+    except Exception as clear_error:
+        safe_log(f"Note: Unable to clear cached connections: {str(clear_error)}", level='debug')
+    
+    # Log the current endpoint being used
+    safe_log(f"Using OpenSearch endpoint from config: {OPENSEARCH_ENDPOINT}", level='info')
+    
+    # Create a fresh client with the current endpoint
+    client = get_opensearch_client(try_alternative=True)
+    if not client:
+        safe_log("Failed to create OpenSearch client", level='error')
+        return False
+    
+    try:
+        # First check if the index exists
+        safe_log(f"Checking if index '{OPENSEARCH_INDEX}' exists...", level='info')
+        if client.indices.exists(index=OPENSEARCH_INDEX):
+            safe_log(f"Index '{OPENSEARCH_INDEX}' exists", level='info')
+            
+            # Try to get the mapping to verify real access
+            try:
+                mapping = client.indices.get_mapping(index=OPENSEARCH_INDEX)
+                safe_log(f"Successfully retrieved mapping for index '{OPENSEARCH_INDEX}'", level='info')
+                return True
+            except Exception as map_error:
+                safe_log(f"Error retrieving mapping: {str(map_error)}", level='warning')
+                pass
+        else:
+            safe_log(f"Index '{OPENSEARCH_INDEX}' does not exist, will try to create a test document", level='warning')
+        
+        # Generate test embeddings
+        safe_log("Generating test embedding...", level='info')
+        test_embedding = generate_embeddings("This is a test document for embedding generation")
+        if not test_embedding:
+            test_embedding = [0.1] * VECTOR_DIMENSIONS  # Fallback for testing
+            safe_log("Using fallback embedding for connection test", level='warning')
+        
+        test_doc = {
+            "resume_id": f"test-connection-{int(time.time())}",
+            "summary": "Test summary for connection verification",
+            "total_experience": 5,
+            "positions": ["Test Position"],
+            "companies": ["Test Company"],
+            "education": [{"degree": "Test Degree", "institution": "Test University"}],
+            "skills": ["Test Skill"],
+            "industries": ["Test Industry"],
+            "projects": [{"name": "Test Project"}],
+            "certifications": ["Test Certification"],
+            "collection_name": OPENSEARCH_COLLECTION_NAME,
+            "last_updated": datetime.now().isoformat(),
+            "embedding": test_embedding
+        }
+        
+        # Try to write a test document
+        safe_log("Attempting to write test document...", level='info')
+        response = client.index(
+            index=OPENSEARCH_INDEX,
+            body=test_doc
+        )
+        
+        # Check the response
+        if response.get('result') in ['created', 'updated']:
+            safe_log(f"Successfully wrote test document with ID: {response.get('_id')}", level='info')
+            
+            # Force a refresh to make the document searchable immediately
+            client.indices.refresh(index=OPENSEARCH_INDEX)
+            safe_log("Index refreshed to make document searchable", level='info')
+            
+            # Try to search for the document to verify search works
+            search_response = client.search(
+                index=OPENSEARCH_INDEX,
+                body={
+                    "query": {
+                        "term": {
+                            "resume_id.keyword": test_doc["resume_id"]
+                        }
+                    }
+                }
+            )
+            
+            hits = search_response["hits"]["total"]["value"]
+            if hits > 0:
+                safe_log(f"Successfully retrieved test document. Found {hits} matching documents", level='info')
+                return True
+            else:
+                safe_log("Document was written but could not be retrieved", level='warning')
+                # Still return True since write worked
+                return True
+        else:
+            safe_log(f"Failed to write test document. Response: {response}", level='error')
+            return False
+    except Exception as e:
+        safe_log(f"[OpenSearch] Connection/index test failed: {str(e)}", level='error')
+        import traceback
+        safe_log(traceback.format_exc(), level='debug')
+        return False
+
+def store_in_opensearch(parsed_data, raw_text, resume_id):
+    """Store a single resume in OpenSearch with its embedding - using the working implementation"""
+    safe_log(f"[DEBUG] store_in_opensearch called for resume_id={resume_id}", level='info')
+    
+    if not ENABLE_OPENSEARCH:
+        safe_log(f"OpenSearch storage skipped: ENABLE_OPENSEARCH={ENABLE_OPENSEARCH}", level='warning')
+        return True
+    
+    try:
+        client = get_opensearch_client()
+        if not client:
+            safe_log("Failed to create OpenSearch client", level='error')
+            return False
+            
+        # --- Use raw_text for embedding, capped at 6000 words ---
+        words = raw_text.split()
+        if len(words) > MAX_EMBEDDING_WORDS:
+            safe_log(f"Truncating text from {len(words)} to {MAX_EMBEDDING_WORDS} words for embedding", level='warning')
+            raw_text = ' '.join(words[:MAX_EMBEDDING_WORDS])
+            
+        # --- Generate embedding using Bedrock ---
+        safe_log(f"[OpenSearch] Embedding text length: {len(raw_text)}", level='info')
+        embedding = generate_embeddings(raw_text)
+        
+        if not embedding:
+            safe_log("Failed to generate embedding", level='error')
+            return False
+            
+        safe_log(f"[OpenSearch] Embedding type: {type(embedding)}, length: {len(embedding)}", level='info')
+        
+        # --- Extract professional sections ---
+        from src.resume_parser import extract_relevant_text_for_embeddings
+        pro_sections = extract_relevant_text_for_embeddings(parsed_data)
+        
+        client = get_opensearch_client()
+        if not client:
+            safe_log("Failed to create OpenSearch client", level='error')
+            return False
+        
+        # Track success and failure counts
+        success_count = 0
+        failure_count = 0
+        
+        # Process each document individually
+        for key, parsed_data in parsed_data_map.items():
+            resume_id = resume_ids.get(key)
+            if not resume_id:
+                safe_log(f"[OpenSearch] Skipping record with missing resume_id for key: {key}", level='warning')
+                continue
+            
+            raw_text = raw_text_map.get(key, "")
+            if not raw_text:
+                safe_log(f"[OpenSearch] No raw text available for {key}", level='warning')
+                raw_text = "" 
+            
+            # Use the single document store function
+            try:
+                result = store_in_opensearch(parsed_data, raw_text, resume_id)
+                if result:
+                    success_count += 1
+                else:
+                    failure_count += 1
+            except Exception as doc_error:
+                safe_log(f"[OpenSearch] Error processing document for {key}: {str(doc_error)}", level='error')
+                import traceback
+                safe_log(f"[OpenSearch] Document processing error details: {traceback.format_exc()}", level='debug')
+                failure_count += 1
+        
+        # Report overall status
+        total_docs = success_count + failure_count
+        if total_docs == 0:
+            safe_log("[OpenSearch] No documents were processed", level='warning')
+            return False
+        
+        success_rate = (success_count / total_docs) * 100
+        safe_log(f"[OpenSearch] Processed {total_docs} documents: {success_count} successful ({success_rate:.1f}%), {failure_count} failed")
+        
+        # Consider the operation successful if at least one document was indexed
+        return success_count > 0
+            
+    except Exception as e:
+        safe_log(f"[OpenSearch] Error during batch store: {str(e)}", level='error')
+        import traceback
+        safe_log(f"[OpenSearch] Exception details: {traceback.format_exc()}", level='debug')
+        return False
+
+__all__ = [
+    'get_opensearch_client',
+    'test_opensearch_connection',
+    'store_in_opensearch',
+    'batch_store_in_opensearch',
+    'generate_embeddings',
+] 

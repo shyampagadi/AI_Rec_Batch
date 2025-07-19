@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  resume-parser:
+    build:
+      context: ..
+      dockerfile: resume_parser_NEW_FINAL_with_docs/Dockerfile
+    container_name: resume-parser-batch
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - S3_RAW_PREFIX=${S3_RAW_PREFIX:-raw/}
+      - S3_PROCESSED_PREFIX=${S3_PROCESSED_PREFIX:-processed/}
+      - ENABLE_POSTGRES=${ENABLE_POSTGRES:-true}
+      - POSTGRES_HOST=${POSTGRES_HOST:-localhost}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - ENABLE_DYNAMODB=${ENABLE_DYNAMODB:-true}
+      - DYNAMODB_TABLE_NAME=${DYNAMODB_TABLE_NAME:-resume-data}
+      - ENABLE_OPENSEARCH=${ENABLE_OPENSEARCH:-true}
+      - OPENSEARCH_ENDPOINT=${OPENSEARCH_ENDPOINT}
+      - OPENSEARCH_INDEX=${OPENSEARCH_INDEX:-resume-embeddings}
+      - BEDROCK_MODEL_ID=${BEDROCK_MODEL_ID:-anthropic.claude-v2}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./logs:/app/logs
+      - ./output:/app/output
+      - ./temp:/app/temp
+    command: ["--batch", "--max_files", "${MAX_FILES:-100}", "--upload_to_s3", "${UPLOAD_TO_S3:-true}"]
+    # Add network configuration if connecting to databases in the same Docker network
+    networks:
+      - resume-parser-network
+
+  # You can add other services here like PostgreSQL, DynamoDB Local, etc. if needed
+  # postgres:
+  #   image: postgres:14
+  #   environment:
+  #     - POSTGRES_USER=postgres
+  #     - POSTGRES_PASSWORD=postgres
+  #     - POSTGRES_DB=postgres
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   networks:
+  #     - resume-parser-network
+
+networks:
+  resume-parser-network:
+    driver: bridge
+
+# Uncomment if using the PostgreSQL service
+# volumes:
+#   postgres-data: 

@@ -1,0 +1,42 @@
+Job Title: Full Stack Developer - Java/React/Node
+Location: Remote
+Experience Required: 1-3 years
+Job Type: Full-Time
+
+About the Role:
+We are seeking a skilled Full Stack Developer with experience in both Java and JavaScript frameworks to join our innovative healthcare technology team. The ideal candidate has worked on healthcare applications and has experience with React, Node.js, and modern cloud technologies.
+
+Key Responsibilities:
+- Develop and maintain web applications using React.js and Node.js
+- Build and enhance backend services using Java and Spring Boot
+- Work with MongoDB and MySQL databases to design efficient data models
+- Collaborate in an Agile environment using GitHub and Jira for project management
+- Deploy and manage applications on AWS cloud infrastructure
+- Develop features for healthcare and wellness applications
+
+Required Skills & Experience:
+- 1-2 years of hands-on experience in full stack development
+- Proficiency in JavaScript, React.js, Node.js, and HTML/CSS
+- Experience with Java backend development
+- Knowledge of MongoDB and MySQL databases
+- Experience with GitHub for version control
+- Working knowledge of AWS cloud services
+- Previous experience with healthcare or wellness applications
+
+Preferred Qualifications:
+- Experience with Spring Boot
+- Experience with Python/Django
+- AWS certification
+- Experience with virtualization technologies
+- Proven track record of successful project delivery
+
+Soft Skills:
+- Strong problem-solving abilities
+- Excellent team collaboration
+- Ability to work independently
+- Good communication skills
+
+Why Join Us:
+- Opportunity to work on meaningful healthcare solutions
+- Collaborative work environment focused on innovation
+- Continuous learning and growth opportunities 

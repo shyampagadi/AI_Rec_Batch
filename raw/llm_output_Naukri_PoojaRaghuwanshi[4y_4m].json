@@ -1,0 +1,79 @@
+{
+  "resume_id": "8a6f8986-c2fc-4844-ad8c-2fa4381f63f8",
+  "s3_key": "raw/Naukri_PoojaRaghuwanshi[4y_4m].pdf",
+  "original_filename": "Naukri_PoojaRaghuwanshi[4y_4m].pdf",
+  "file_type": "pdf",
+  "llm_output": {
+    "resume_id": "8a6f8986-c2fc-4844-ad8c-2fa4381f63f8",
+    "full_name": "Pooja Raghuwanshi",
+    "email": "poojaraghuwanshi93@gmail.com",
+    "phone_number": "+91 9131543651",
+    "linkedin": "https://in.linkedin.com/in/pooja-raghuwanshi-293283164",
+    "address": "India",
+    "summary": "Highly motivated and detail-oriented Technology Analyst with 4.4 years of experience in software development, Agile collaboration, and technical support. Proficient in Java, Spring Boot, and Microservices. Proven track record of delivering high-quality results and providing exceptional customer service.",
+    "skills": [
+      "Java Core",
+      "Java8",
+      "SQL",
+      "MySQL",
+      "Spring Boot",
+      "RESTful APIs",
+      "Microservices",
+      "JWT",
+      "HTLML5 & CSS3",
+      "JUnit",
+      "JDBC",
+      "Git",
+      "Github",
+      "Jenkins",
+      "Jira",
+      "SonarQube",
+      "CI/CD",
+      "Maven",
+      "Postman",
+      "Agile"
+    ],
+    "positions": [
+      "Technology Analyst",
+      "Senior System Engineer"
+    ],
+    "companies": [
+      {
+        "name": "Infosys Limited",
+        "duration": "April 2020 - Present",
+        "description": "Worked on multiple feature implementations and testing of features, developed and maintained scalable microservices using Spring Boot, optimized DB queries, improving response time by 30%."
+      },
+      {
+        "name": "Infosys Limited",
+        "duration": "Feb 2021 - March 2024",
+        "description": "Analyzed jira issues reported by QA team, worked on enhancement related to security, worked on LDAP, reduced the sync process time by 40%."
+      }
+    ],
+    "education": [
+      {
+        "degree": "Bachelors in Technology",
+        "institution": "Madhav Institute of Technology and Science Gwalior",
+        "year": "2016 - 2020"
+      }
+    ],
+    "certifications": [
+      "Java - SE8 Programmer part- 1"
+    ],
+    "achievements": [
+      "Most Valuable Player Cisco glory",
+      "Merit Certiﬁcate Central Board of Delhi"
+    ],
+    "industries": [
+      "Software Development",
+      "IT"
+    ],
+    "opensearch_success": true,
+    "processing_time": 13.863000631332397,
+    "s3_key": "raw/Naukri_PoojaRaghuwanshi[4y_4m].pdf",
+    "file_type": "pdf",
+    "original_filename": "Naukri_PoojaRaghuwanshi[4y_4m].pdf"
+  },
+  "timestamp": "2025-05-24 21:22:13",
+  "model_id": "meta.llama3-70b-instruct-v1:0",
+  "processing_time": 19.800997972488403
+}

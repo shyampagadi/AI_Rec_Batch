@@ -1,0 +1,91 @@
+PUT /resume-embeddings
+{
+  "settings": {
+    "index": {
+      "knn": true,
+      "knn.algo_param.ef_search": 512,
+      "analysis": {
+        "normalizer": {
+          "lowercase": {
+            "type": "custom",
+            "filter": ["lowercase"]
+          }
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "resume_id": {
+        "type": "keyword"
+      },
+      "embedding": {
+        "type": "knn_vector",
+        "dimension": 1024,
+        "method": {
+          "name": "hnsw",
+          "engine": "nmslib",
+          "space_type": "cosinesimil",
+          "parameters": {
+            "ef_construction": 512,
+            "m": 32
+          }
+        }
+      },
+      "summary": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "total_years_experience": {
+        "type": "float"
+      },
+      "positions": {
+        "type": "keyword"
+      },
+      "education": {
+        "type": "nested",
+        "properties": {
+          "degree": {"type": "text"},
+          "institution": {"type": "keyword"}
+        }
+      },
+      "skills": {
+        "type": "keyword",
+        "normalizer": "lowercase"
+      },
+      "industries": {
+        "type": "keyword"
+      },
+      "projects": {
+        "type": "nested",
+        "properties": {
+          "name": {"type": "text"},
+          "technologies": {"type": "keyword"}
+        }
+      },
+      "certifications": {
+        "type": "keyword"
+      },
+      "collection_name": {
+        "type": "keyword"
+      },
+      "last_updated": {
+        "type": "date",
+        "format": "strict_date_optional_time_nanos"
+      }
+    }
+  }
+}
+
+
+GET /resume-embeddings/_search
+{
+  "size": 10000,
+    "query": {
+    "match_all": {}
+  }
+}

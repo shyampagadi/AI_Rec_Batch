@@ -1,0 +1,60 @@
+# Data Scientist
+
+## About the Role
+We are seeking a skilled Data Scientist to join our analytics team. In this role, you will extract insights from complex datasets, develop statistical models, and help drive data-informed decision making across the organization.
+
+## Required Experience
+- 3+ years of experience in data science or related analytical role
+- Proven track record of applying statistical methods to solve business problems
+- Experience with data manipulation, analysis, and visualization tools
+- Background in developing machine learning models for prediction and classification
+- History of communicating technical findings to non-technical stakeholders
+
+## Required Skills
+- Python (pandas, NumPy, scikit-learn)
+- SQL
+- Data Visualization (Matplotlib, Seaborn, Plotly)
+- Statistical Analysis
+- Machine Learning
+- A/B Testing
+- Hypothesis Testing
+- Data Cleaning and Preprocessing
+- Feature Engineering
+
+## Nice-to-Have Skills
+- R programming language
+- Experience with big data technologies (Spark, Hadoop)
+- Knowledge of deep learning frameworks (TensorFlow, PyTorch)
+- Familiarity with cloud platforms (AWS, GCP, Azure)
+- Natural Language Processing
+- Time Series Analysis
+- Bayesian Statistics
+- Experiment Design
+- Dashboard creation (Tableau, Power BI)
+
+## Responsibilities
+- Analyze large, complex datasets to extract actionable insights
+- Build predictive models and machine learning algorithms
+- Design and evaluate A/B tests to measure the impact of product changes
+- Create visualizations and dashboards to communicate findings
+- Collaborate with product, engineering, and business teams
+- Develop reproducible analysis pipelines
+- Stay current with advancements in data science techniques and tools
+
+## Qualifications
+- Bachelor's or Master's degree in Statistics, Mathematics, Computer Science, or related field
+- Strong analytical and problem-solving skills
+- Excellent communication abilities, both written and verbal
+- Curiosity-driven approach to exploring data
+- Ability to translate business questions into analytical frameworks
+
+## Seniority Level
+Mid-level
+
+## Job Type
+Full-time, On-site
+
+## Industry
+Technology, E-commerce
+
+We provide a collaborative work environment, competitive salary, comprehensive benefits, and opportunities for professional development. Join us to help build data-driven solutions that impact millions of users. 

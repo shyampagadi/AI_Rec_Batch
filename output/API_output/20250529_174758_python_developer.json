@@ -1,0 +1,1918 @@
+{
+  "message": "Successfully matched resumes",
+  "total_results": 30,
+  "job_info": {
+    "title": "Python developer",
+    "required_experience": 3,
+    "required_skills": [
+      "Python development",
+      "object-oriented programming",
+      "data structures",
+      "algorithms"
+    ]
+  },
+  "skill_gap_analysis": [
+    {
+      "skill": "Python development",
+      "missing_count": 30,
+      "missing_percent": 100.0
+    },
+    {
+      "skill": "data structures",
+      "missing_count": 30,
+      "missing_percent": 100.0
+    },
+    {
+      "skill": "algorithms",
+      "missing_count": 30,
+      "missing_percent": 100.0
+    },
+    {
+      "skill": "object-oriented programming",
+      "missing_count": 28,
+      "missing_percent": 93.3
+    }
+  ],
+  "processing_metadata": {
+    "timestamp": "2025-05-29T12:17:59.152763",
+    "processing_time_ms": 13753,
+    "model_id": "meta.llama3-70b-instruct-v1:0",
+    "analyzed_candidates_count": 5,
+    "performance": {
+      "total_duration_ms": 13753,
+      "candidates_per_second": 2.18
+    }
+  },
+  "results": [
+    {
+      "resume_id": "70da3b33-6c87-4822-8877-279fb2116f5a",
+      "scores": {
+        "overall": 74.24,
+        "skill_match": 37.5,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 37.5
+      },
+      "skills": {
+        "all": [
+          "Python",
+          "Flask",
+          "Django",
+          "Django REST Framework (DRF)",
+          "Object-Oriented Programming",
+          "SOLID Principles",
+          "Low Level Designs",
+          "Microservices",
+          "Monolithic Systems",
+          "High Level Designs",
+          "MySQL",
+          "PostgreSQL",
+          "NoSQL (Redis, MongoDB, Cassandra)",
+          "Prometheus",
+          "Elastic Search",
+          "Ka<ka",
+          "Zookeeper",
+          "Rasa",
+          "Natural Language Processing (NLP)",
+          "Intent Detection",
+          "Named Entity Recognition (NER)",
+          "ETL Work<low Automation",
+          "AWS",
+          "Docker",
+          "Jenkins",
+          "GitLab CI",
+          "Prom QL",
+          "Alert Manager (Slack, Outlook, PagerDuty)",
+          "NumPy",
+          "Pandas"
+        ],
+        "matching": [
+          "Object-Oriented Programming"
+        ],
+        "missing": [
+          "Python development",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 8.0,
+        "required": 3,
+        "difference": 5.0
+      },
+      "positions": [
+        "Associate Consultant",
+        "Software Engineer II",
+        "Software Engineer"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": "",
+      "rank_position": 1,
+      "professional_analysis": "```\n\nHere is a professional assessment of the candidate's fit for the Python developer position:\n\nBased on the provided information, this candidate presents a moderate overall match (74.2%) for the Python developer role. Their extensive experience (8.0 years) and proficiency in relevant skills such as Flask, Django, and Django REST Framework (DRF) are significant strengths. However, the candidate lacks experience in essential skills like Python development, data structures, and algorithms, which may require additional training or development. Despite this gap, I would recommend this candidate as a good potential fit, given their strong foundation in related skills and experience."
+    },
+    {
+      "resume_id": "51676b63-c819-4cd5-9fb9-5357c4681666",
+      "scores": {
+        "overall": 74.24,
+        "skill_match": 37.5,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 37.5
+      },
+      "skills": {
+        "all": [
+          "Python",
+          "Flask",
+          "Django",
+          "Django REST Framework (DRF)",
+          "Object-Oriented Programming",
+          "SOLID Principles",
+          "Low Level Designs",
+          "Microservices",
+          "Monolithic Systems",
+          "High Level Designs",
+          "MySQL",
+          "PostgreSQL",
+          "NoSQL (Redis, MongoDB, Cassandra)",
+          "Prometheus",
+          "Elastic Search",
+          "Ka<ka",
+          "Zookeeper",
+          "Rasa",
+          "Natural Language Processing (NLP)",
+          "Intent Detection",
+          "Named Entity Recognition (NER)",
+          "ETL Work<low Automation",
+          "AWS",
+          "Docker",
+          "Jenkins",
+          "GitLab CI",
+          "Prom QL",
+          "Alert Manager (Slack, Outlook, PagerDuty)",
+          "NumPy",
+          "Pandas"
+        ],
+        "matching": [
+          "Object-Oriented Programming"
+        ],
+        "missing": [
+          "Python development",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 8.0,
+        "required": 3,
+        "difference": 5.0
+      },
+      "positions": [
+        "Associate Consultant",
+        "Software Engineer II",
+        "Software Engineer"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": "",
+      "rank_position": 2,
+      "professional_analysis": "```\n\nHere is a professional assessment of the candidate's fit for the position:\n\nBased on the provided information, this candidate presents a moderate overall match (74.2%) for the Python developer position. Their extensive experience (8.0 years) and proficiency in relevant skills such as Flask, Django, and Django REST Framework (DRF) are significant strengths. However, the candidate lacks experience in essential skills like Python development, data structures, and algorithms, which may require additional training or development. Overall, I would recommend this candidate as having good potential, but they may need to address these skill gaps to excel in the role."
+    },
+    {
+      "resume_id": "93843c24-0a43-4401-9850-3de1314d70e8",
+      "scores": {
+        "overall": 53.09,
+        "skill_match": 12.5,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "Appian BPM",
+          "Python",
+          "My SQL",
+          "XML",
+          "HTTP protocols"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 7.0,
+        "required": 3,
+        "difference": 4.0
+      },
+      "positions": [
+        "Senior Software Engineer / Lead",
+        "Appian Consultant",
+        "Designer",
+        "DEVELOPMENT"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": "",
+      "rank_position": 3,
+      "professional_analysis": "Here is the assessment:\n\nThis candidate presents a moderate overall match for the Python developer position, with a strong experience match but a limited skill match. Their extensive experience as a Senior Software Engineer and Lead, as well as proficiency in Python, are significant strengths. However, the lack of direct experience in Python development, object-oriented programming, data structures, and algorithms raises concerns. I would recommend this candidate as having good potential, pending further evaluation to address the skill gaps."
+    },
+    {
+      "resume_id": "5fb30911-36b1-4b11-b50e-009282950a33",
+      "scores": {
+        "overall": 47.2,
+        "skill_match": 25.0,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "Python",
+          "SQL",
+          "Py-Spark",
+          "Databricks",
+          "Data Validation",
+          "Data Warehousing",
+          "Informatica",
+          "Data Analysis",
+          "SQLServer",
+          "AWS Redshift",
+          "RDS",
+          "Wherescape",
+          "Data Extraction/Ingestion",
+          "AWS - S3",
+          "Lambda",
+          "Glue",
+          "EC2",
+          "EMR",
+          "StepFunction",
+          "CloudWatch",
+          "Athena",
+          "JIRA"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 5.3,
+        "required": 3,
+        "difference": 2.3
+      },
+      "positions": [
+        "Data Engineer",
+        "Associate",
+        "System Engineer"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": "",
+      "rank_position": 4,
+      "professional_analysis": "```\n\nHere is a professional assessment of the candidate's fit for the Python developer position:\n\nBased on the provided profile, this candidate presents a moderate overall match (47.2%) for the Python developer role. A key strength is their extensive experience (5.3 years) in relevant fields, including data engineering and system engineering. However, a significant gap exists in the required skills, as they lack proficiency in Python development, object-oriented programming, data structures, and algorithms. Despite their impressive skill set in other areas, I would recommend this candidate as having good potential, but requiring additional skills training or development to fully meet the position's requirements."
+    },
+    {
+      "resume_id": "867e1555-f260-4205-80ba-878adbb2c96b",
+      "scores": {
+        "overall": 32.02,
+        "skill_match": 0.0,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 0.0
+      },
+      "skills": {
+        "all": [
+          "JavaScript",
+          "React JS",
+          "NLP Services",
+          "SQL",
+          "Visual Studio Code",
+          "Eclipse",
+          "Microsoft Windows",
+          "Linux",
+          "POSTMAN",
+          "Twilio",
+          "GitLab",
+          "Jira",
+          "EDW",
+          "Vision",
+          "Kore",
+          "MS Bot Framework",
+          "Amazon Alexa",
+          "LUIS",
+          "Dialogflow",
+          "Amazon Lex",
+          "Confluence",
+          "MS Project",
+          "Word",
+          "Excel",
+          "Visio",
+          "PowerPoint"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": []
+      },
+      "experience": {
+        "years": 8.0,
+        "required": 3,
+        "difference": 5.0
+      },
+      "positions": [
+        "Technical Implementation Coordinator",
+        "Solution Architect",
+        "Senior Analyst Programmer",
+        "Associate"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": "",
+      "rank_position": 5,
+      "professional_analysis": "Here is the assessment:\n\nThis candidate presents a low overall match quality of 32.0%, primarily due to a lack of direct experience with Python development, object-oriented programming, data structures, and algorithms, which are essential skills for the Python developer position. However, their extensive experience of 8.0 years and proficiency in various technical tools, such as SQL, Visual Studio Code, and Eclipse, demonstrate a strong technical foundation. To be a strong contender, the candidate would need to acquire and demonstrate proficiency in the missing skills. Despite this, I would recommend this candidate as having good potential, pending further evaluation and training in the required skills."
+    },
+    {
+      "resume_id": "6dacca45-f795-442c-9eec-0f78615d5cb5",
+      "scores": {
+        "overall": 31.17,
+        "skill_match": 0.0,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 0.0
+      },
+      "skills": {
+        "all": [
+          "Informatica PowerCentre",
+          "IICS",
+          "Oracle",
+          "SQL Server",
+          "Unix",
+          "Snowflake",
+          "Autosys",
+          "Control-M",
+          "JIRA",
+          "Agile Methodologies"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": []
+      },
+      "experience": {
+        "years": 6.2,
+        "required": 3,
+        "difference": 3.2
+      },
+      "positions": [
+        "Informatica Developer"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "3bf3c20f-5485-40fa-9bad-1aa188a49bcd",
+      "scores": {
+        "overall": 23.68,
+        "skill_match": 25.0,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "PySpark",
+          "AWS EMR",
+          "SQL",
+          "Big Data Technologies",
+          "Spark RDDs",
+          "DataFrames",
+          "MS SQL Server",
+          "MySQL",
+          "Oracle",
+          "Hadoop",
+          "Sqoop",
+          "Hive",
+          "Apache Spark",
+          "Python"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 10.0,
+        "required": 3,
+        "difference": 7.0
+      },
+      "positions": [
+        "Big Data Engineer",
+        "MS SQL Developer"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "af16cdde-c36f-4902-898a-40de4965f958",
+      "scores": {
+        "overall": 21.79,
+        "skill_match": 0.0,
+        "experience_match": 100.0,
+        "position_match": 70,
+        "semantic_match": 0,
+        "skill_coverage": 0.0
+      },
+      "skills": {
+        "all": [
+          "Boomi",
+          "API Management",
+          "JavaScript",
+          "Groovy Script",
+          "Oracle",
+          "MySQL",
+          "SoapUI",
+          "Postman",
+          "Workato",
+          "EDi",
+          "MDM/MDH",
+          "Private & Public – IPaas, SaaS, PaaS, IaaS cloud Technologies"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": []
+      },
+      "experience": {
+        "years": 5.1,
+        "required": 3,
+        "difference": 2.1
+      },
+      "positions": [
+        "Boomi Developer",
+        "Developer",
+        "Integration Developer",
+        "Test Engineer"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "af8b2a84-7f54-4a48-8879-ba2612699edc",
+      "scores": {
+        "overall": 20.86,
+        "skill_match": 12.5,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 0.0
+      },
+      "skills": {
+        "all": [
+          "FastAPI",
+          "Django",
+          "Flask",
+          "Rive-Script",
+          "Pymongo",
+          "Postman",
+          "Unix",
+          "Shell Scripting",
+          "Linux Network Services",
+          "Data Science and Analytics",
+          "AI Frameworks",
+          "ML/DL Frameworks",
+          "Platform",
+          "Databases",
+          "Version Control and CI Tools",
+          "DevOps Tools",
+          "Data Visualization"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": []
+      },
+      "experience": {
+        "years": 8.0,
+        "required": 3,
+        "difference": 5.0
+      },
+      "positions": [
+        "Senior AI Developer",
+        "Senior Member of Technical Staff",
+        "Project Engineer"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "d3a53512-a8f8-44ac-9782-89f02bdf31c1",
+      "scores": {
+        "overall": 20.72,
+        "skill_match": 25.0,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "Data Analysis",
+          "Extract Transform Load (ETL)",
+          "Data Processing",
+          "Leadership & Training",
+          "Process Improvement",
+          "Data Visualization",
+          "Organization Initiatives",
+          "Python",
+          "SQL",
+          "MS Excel",
+          "PySpark",
+          "Machine learning (Scikit-learn)",
+          "GitHub",
+          "LucidChart"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 5.6,
+        "required": 3,
+        "difference": 2.6
+      },
+      "positions": [
+        "Product Analyst",
+        "Data Analyst"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "e935877e-9ce2-47f7-ad42-60e643cbcb1e",
+      "scores": {
+        "overall": 20.64,
+        "skill_match": 25.0,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "Google apps",
+          "Numpy",
+          "Pandas",
+          "SQL",
+          "Python",
+          "Advanced Excel",
+          "PowerBI",
+          "PySpark",
+          "Azure Cloud Services",
+          "Amazon Web Services (AWS)",
+          "Databricks",
+          "Amazon Kinesis",
+          "Azure Synapse",
+          "Azure Data Factory",
+          "AWS Glue",
+          "Amazon Lambda",
+          "Azure SQL Server"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 6.6,
+        "required": 3,
+        "difference": 3.6
+      },
+      "positions": [
+        "Senior Data Engineer",
+        "Data Engineer",
+        "Data Analyst"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "0b4a9e6d-ed63-4b48-8ace-39717cb480d1",
+      "scores": {
+        "overall": 19.88,
+        "skill_match": 37.5,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 0.0
+      },
+      "skills": {
+        "all": [
+          "Data Science",
+          "Machine Learning",
+          "Natural Language Processing (NLP)",
+          "Artificial Intelligence (AI)",
+          "Deep Learning",
+          "Generative AI",
+          "Retrieval Augmented Generation (RAG)",
+          "Agentic Frameworks",
+          "Transfer Learning",
+          "Python Programming",
+          "Predictive Modelling",
+          "Named Entity Recognition (NER)",
+          "Sentiment Analysis",
+          "Classification",
+          "Clustering",
+          "Ensemble Methods",
+          "Information Retrieval",
+          "Text Generation",
+          "Large Language Models (LLMs)",
+          "Feature Engineering",
+          "Quantitative/Advanced Analytics",
+          "Cloud Computing",
+          "Data Wrangling",
+          "Crew AI",
+          "Langchain",
+          "Big Data Analytics",
+          "Agile Methodology",
+          "Dimensionality Reduction",
+          "Database Management",
+          "Business requirements gathering",
+          "Data science research methods"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": []
+      },
+      "experience": {
+        "years": 8.0,
+        "required": 3,
+        "difference": 5.0
+      },
+      "positions": [
+        "Senior Data Scientist",
+        "Machine Learning Specialist",
+        "Senior Product Engineer",
+        "Data Analyst",
+        "Programming Analyst"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "fcc5179d-4038-4e0c-8d35-d43977b7a9d1",
+      "scores": {
+        "overall": 19.88,
+        "skill_match": 37.5,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 0.0
+      },
+      "skills": {
+        "all": [
+          "Data Science",
+          "Machine Learning",
+          "Natural Language Processing (NLP)",
+          "Artificial Intelligence (AI)",
+          "Deep Learning",
+          "Generative AI",
+          "Retrieval Augmented Generation (RAG)",
+          "Agentic Frameworks",
+          "Transfer Learning",
+          "Python Programming",
+          "Predictive Modelling",
+          "Named Entity Recognition (NER)",
+          "Sentiment Analysis",
+          "Classification",
+          "Clustering",
+          "Ensemble Methods",
+          "Information Retrieval",
+          "Text Generation",
+          "Large Language Models (LLMs)",
+          "Feature Engineering",
+          "Quantitative/Advanced Analytics",
+          "Cloud Computing",
+          "Data Wrangling",
+          "Crew AI",
+          "Langchain",
+          "Big Data Analytics",
+          "Agile Methodology",
+          "Dimensionality Reduction",
+          "Database Management",
+          "Business requirements gathering",
+          "Data science research methods"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": []
+      },
+      "experience": {
+        "years": 8.0,
+        "required": 3,
+        "difference": 5.0
+      },
+      "positions": [
+        "Senior Data Scientist",
+        "Machine Learning Specialist",
+        "Senior Product Engineer",
+        "Data Analyst",
+        "Programming Analyst"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "3d8a5d01-302e-4963-8b51-026409052a79",
+      "scores": {
+        "overall": 19.8,
+        "skill_match": 12.5,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "Python",
+          "Scala",
+          "Hadoop",
+          "Spark",
+          "PySpark",
+          "SQL",
+          "NoSQL",
+          "HBase",
+          "AWS",
+          "Hive",
+          "Sqoop",
+          "Autosys",
+          "Airflow",
+          "Machine Learning"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 5.0,
+        "required": 3,
+        "difference": 2.0
+      },
+      "positions": [
+        "Big Data Engineer",
+        "Machine Learning Engineer",
+        "Senior Big Data Engineer"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "a3ed8fbe-136b-4cfb-bac0-cccf1c55af64",
+      "scores": {
+        "overall": 19.31,
+        "skill_match": 25.0,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "Azure Data Factory (ADF)",
+          "Azure Databricks",
+          "Informatica Cloud Data Integration",
+          "Informatica Cloud Application Integration",
+          "Informatica Power Center 9.x/10.x",
+          "AWS DMS",
+          "Snowflake",
+          "ADLS Gen2",
+          "Oracle 11g",
+          "AWS Aurora",
+          "AWS Redshift",
+          "SQL Server",
+          "AWS S3",
+          "Python",
+          "Unix",
+          "Airflow",
+          "Control M",
+          "Tableau",
+          "Windows",
+          "Azure repos",
+          "Github",
+          "Azure pipelines"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 6.1,
+        "required": 3,
+        "difference": 3.1
+      },
+      "positions": [
+        "Data Engineer",
+        "ETL Developer",
+        "Consultant"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "62cb3d83-922d-4614-b460-d5e8599098c4",
+      "scores": {
+        "overall": 18.66,
+        "skill_match": 25.0,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "LLM Chatbot Development",
+          "Gen AI RAG Framework",
+          "Prompt Engineering",
+          "Pandas Dataframe Agent",
+          "Snowflake Cortex Analyst",
+          "Generative AI Technologies",
+          "Python",
+          "SQL",
+          "CICS",
+          "COBOL",
+          "TensorFlow",
+          "PyTorch",
+          "LangChain",
+          "LlamaIndex",
+          "Streamlit",
+          "Flask",
+          "FastAPI",
+          "Data Analysis",
+          "Data Modeling",
+          "Cloud Platforms",
+          "Database"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 9.0,
+        "required": 3,
+        "difference": 6.0
+      },
+      "positions": [
+        "Senior Software Engineer",
+        "Data Analyst",
+        "Data Modeler",
+        "Data Architect",
+        "Software Developer"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "a0fdbe21-7d1f-40d2-b83e-e9fe4776baff",
+      "scores": {
+        "overall": 18.04,
+        "skill_match": 12.5,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "Informatica Power Center",
+          "IICS",
+          "Oracle",
+          "Db2",
+          "SQL",
+          "Python",
+          "WinSCP",
+          "Putty"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 5.6,
+        "required": 3,
+        "difference": 2.6
+      },
+      "positions": [
+        "Software Engineer",
+        "Associate_Projects"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "0719b8ea-1fac-43c1-a951-58e7da33a9db",
+      "scores": {
+        "overall": 17.98,
+        "skill_match": 12.5,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "Python",
+          "SQL",
+          "Apache Spark",
+          "Pandas",
+          "PySpark",
+          "AWS",
+          "Lambda",
+          "S3",
+          "Athena",
+          "Glue",
+          "MongoDB",
+          "Terraform",
+          "Git",
+          "GitHub",
+          "Snowflake"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 5.5,
+        "required": 3,
+        "difference": 2.5
+      },
+      "positions": [
+        "Data Engineer"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "6d007ec7-6572-40b1-ab08-5842f9fefaee",
+      "scores": {
+        "overall": 17.68,
+        "skill_match": 0.0,
+        "experience_match": 100.0,
+        "position_match": 70,
+        "semantic_match": 0,
+        "skill_coverage": 0.0
+      },
+      "skills": {
+        "all": [
+          "PHP",
+          "MySQL",
+          "Linux",
+          "CSS",
+          "HTML",
+          "Java Script",
+          "Zend framework",
+          "WordPress",
+          "Drupal 7",
+          "Drush",
+          "Magento",
+          "Code igniter",
+          "REST Web Service",
+          "JQuery",
+          "AJAX",
+          "LAMP Stack",
+          "Memcache",
+          "Apache",
+          "Shell scripts",
+          "MySQL Query writing"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": []
+      },
+      "experience": {
+        "years": 14.0,
+        "required": 3,
+        "difference": 11.0
+      },
+      "positions": [
+        "Associate- Projects",
+        "Senior Software Engineer",
+        "Senior PHP Developer",
+        "PHP Developer",
+        "Architect",
+        "Developer",
+        "Senior Developer"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "9e00861b-3443-4302-acd0-9a9b18400e2a",
+      "scores": {
+        "overall": 17.67,
+        "skill_match": 25.0,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "Alteryx",
+          "Oracle ERP",
+          "Big Data Analytics",
+          "Data Governance",
+          "Data Quality",
+          "Data Visualization",
+          "Hadoop",
+          "Spark",
+          "Kafka",
+          "Python",
+          "R",
+          "Java",
+          "SQL",
+          "NoSQL",
+          "Cloud Services",
+          "Azure",
+          "AWS",
+          "GCP"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 6.4,
+        "required": 3,
+        "difference": 3.4
+      },
+      "positions": [
+        "Business Analyst",
+        "Data Analyst"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "2fc2820e-9e96-474e-a976-6cf75168b11c",
+      "scores": {
+        "overall": 17.54,
+        "skill_match": 25.0,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "Python",
+          "PySpark",
+          "SQL",
+          "PLSQL",
+          "Snowflake",
+          "Glue",
+          "Informatica PowerCenter",
+          "AWS s3",
+          "Microsoft SQL server",
+          "HDFS(Hive)",
+          "Power BI",
+          "Sisense",
+          "Data Visualization",
+          "WinOS",
+          "Linux"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 6.5,
+        "required": 3,
+        "difference": 3.5
+      },
+      "positions": [
+        "Associate Consultant (Business Technology – Data Engineering)",
+        "Data Engineer (Software Development)"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "f9840261-7b3c-4f30-80b6-11d736f95897",
+      "scores": {
+        "overall": 17.43,
+        "skill_match": 12.5,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "Python",
+          "PySpark",
+          "SQL",
+          "AWS",
+          "Pandas",
+          "Apache Spark",
+          "Apache Airflow",
+          "Git",
+          "Jupyter Notebook",
+          "VS Code"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 5.0,
+        "required": 3,
+        "difference": 2.0
+      },
+      "positions": [
+        "Data Engineer"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "a38e3723-60e9-42e0-aa35-cbd593269d6f",
+      "scores": {
+        "overall": 17.19,
+        "skill_match": 25.0,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "AWS Glue",
+          "AWS EMR",
+          "Airflow",
+          "Informatica",
+          "SQL",
+          "Data Warehousing",
+          "UNIX",
+          "Control-M",
+          "Github",
+          "GIT",
+          "Servicenow",
+          "Python",
+          "AWS Lambda",
+          "AWS IAM"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 9.0,
+        "required": 3,
+        "difference": 6.0
+      },
+      "positions": [
+        "Software Engineer",
+        "Senior Engineer"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "34e6b712-da96-4ab9-8b45-a0e8d1924212",
+      "scores": {
+        "overall": 16.99,
+        "skill_match": 25.0,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "Azure Databricks",
+          "Azure Data Factory",
+          "Azure Data Lake Gen2",
+          "PySpark",
+          "Python",
+          "SQL",
+          "Spark",
+          "Databricks",
+          "Git",
+          "GitHub",
+          "Jenkins",
+          "Data Pipeline",
+          "Data Warehousing"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 7.0,
+        "required": 3,
+        "difference": 4.0
+      },
+      "positions": [
+        "Azure Data Engineer",
+        "Databricks Developer/ Data Engineer",
+        "Data Ops & Python Engineer"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "5686e7f3-7d87-406c-b908-33a067c37e48",
+      "scores": {
+        "overall": 16.95,
+        "skill_match": 25.0,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "Cloud",
+          "Big Data",
+          "Pyspark",
+          "PL/SQL",
+          "Python",
+          "RDBMS",
+          "Reporting",
+          "Scripting",
+          "SQL Development and Optimization",
+          "ETL Process Design and Optimization",
+          "Cross-functional Team Management",
+          "Agile Methodology and Practices"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 5.11,
+        "required": 3,
+        "difference": 2.1
+      },
+      "positions": [
+        "Data Engineer",
+        "Senior Systems Engineer"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "13d9acca-8cff-4aa6-8c73-6ee220698ead",
+      "scores": {
+        "overall": 16.74,
+        "skill_match": 25.0,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "Informatica Power Center",
+          "Informatica Intelligent Data Management Cloud (IDMC)",
+          "Snowflake",
+          "DBT",
+          "Azure Data Factory (ADF)",
+          "SQL",
+          "PL/SQL",
+          "Python",
+          "shell script",
+          "AWS",
+          "Control-M",
+          "CA workload automation",
+          "Oracle 11g",
+          "db2",
+          "SQL Server",
+          "Teradata",
+          "Windows 10",
+          "Linux",
+          "Oracle SQL Developer",
+          "MS SQL Server 2008 Management Studio",
+          "WinSCP",
+          "JIRA",
+          "Query Surge",
+          "ServiceNow",
+          "Git hub",
+          "Azure DevOps",
+          "Goldengate",
+          "Delphix",
+          "Commvault"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 6.0,
+        "required": 3,
+        "difference": 3.0
+      },
+      "positions": [
+        "Informatica PC/IDMC and Snowflake Developer",
+        "Informatica PC/IICS Developer",
+        "Informatica PC, Developer & Prod Support Engineer"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "a2eebdc4-2cd8-4425-a6b7-55df423885bf",
+      "scores": {
+        "overall": 16.7,
+        "skill_match": 25.0,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "ITIL",
+          "SQL",
+          "ETL monitoring",
+          "incident/problem management",
+          "data pipelines",
+          "automation",
+          "AWS",
+          "Oracle SQL",
+          "Linux/Unix",
+          "Shell Scripting",
+          "Splunk",
+          "Dynatrace",
+          "CI/CD",
+          "Git",
+          "Python"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 3.0,
+        "required": 3,
+        "difference": 0.0
+      },
+      "positions": [
+        "Production Support",
+        "Application Support"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "ff9e45c5-c314-41e3-bfe7-1da89ee50666",
+      "scores": {
+        "overall": 16.54,
+        "skill_match": 25.0,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "Data Migration",
+          "Business Analysis",
+          "Project Management",
+          "Generative AI",
+          "Applied Machine Learning",
+          "C",
+          "Python",
+          "Advanced Excel",
+          "SQL",
+          "Large Language Models",
+          "Huggingface library",
+          "LangChain",
+          "LlamaIndex",
+          "OpenAI"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 12.0,
+        "required": 3,
+        "difference": 9.0
+      },
+      "positions": [
+        "Lead Implementation Consultant",
+        "Senior Business Analyst",
+        "Business Analyst",
+        "Analyst",
+        "Internship",
+        "Quality Assurance"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "aed1ff1c-6b08-46c0-bb75-645f60d2da2f",
+      "scores": {
+        "overall": 16.52,
+        "skill_match": 25.0,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "Hadoop",
+          "HDFS",
+          "MapReduce (MR)",
+          "Spark",
+          "Hive",
+          "HBase",
+          "Sqoop",
+          "Scala",
+          "Python",
+          "JSON",
+          "PARQUET",
+          "AVRO",
+          "ORC",
+          "Azure Data Factory",
+          "Azure Databricks",
+          "Azure Synapse Analytics",
+          "Azure SQL",
+          "AWS",
+          "EC2",
+          "Lambda",
+          "EMR",
+          "Athena",
+          "Glue",
+          "S3",
+          "Redshift",
+          "IAM Policies",
+          "Snowflake",
+          "Git hub",
+          "Bit bucket",
+          "Airflow",
+          "SQL",
+          "Pyspark",
+          "HQL",
+          "MySQL",
+          "Teradata",
+          "PostgreSQL",
+          "SAP HANA",
+          "WinSCP",
+          "VMware work Station",
+          "Putty",
+          "MySQL-Management",
+          "PyCharm",
+          "IntelliJ",
+          "Jupyter Notebook"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 5.6,
+        "required": 3,
+        "difference": 2.6
+      },
+      "positions": [
+        "Senior Data Engineer",
+        "Data Engineer"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    },
+    {
+      "resume_id": "8a07ac94-3f7f-4c2c-bcd8-b11ed0bddce8",
+      "scores": {
+        "overall": 16.52,
+        "skill_match": 25.0,
+        "experience_match": 100.0,
+        "position_match": 0,
+        "semantic_match": 0,
+        "skill_coverage": 12.5
+      },
+      "skills": {
+        "all": [
+          "Pandas",
+          "NumPy",
+          "matplotlib",
+          "seaborn",
+          "Sklearn",
+          "Tensorflow",
+          "Pyspark",
+          "MY SQL",
+          "SQL Server",
+          "DBWare",
+          "Jupyter Notebook",
+          "Google Colab",
+          "Excel",
+          "Tableau",
+          "AWS Lambda",
+          "S3",
+          "Glue",
+          "Data Brew",
+          "Step function",
+          "IAM",
+          "Dyanamodb",
+          "EC2",
+          "RDS",
+          "Data Brick",
+          "Python",
+          "SQL",
+          "Jira",
+          "Jenkins",
+          "Source Tree",
+          "Postman"
+        ],
+        "matching": [],
+        "missing": [
+          "Python development",
+          "object-oriented programming",
+          "data structures",
+          "algorithms"
+        ],
+        "partial_matches": [
+          {
+            "required": "Python development",
+            "resume": "Python"
+          }
+        ]
+      },
+      "experience": {
+        "years": 6.6,
+        "required": 3,
+        "difference": 3.6
+      },
+      "positions": [
+        "AWS Data Engineer",
+        "Data Analyst/ML Engineer"
+      ],
+      "education": [],
+      "companies": [],
+      "projects": [],
+      "certifications": [],
+      "languages": [],
+      "summary": ""
+    }
+  ]
+}

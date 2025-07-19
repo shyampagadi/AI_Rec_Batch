@@ -1,0 +1,48 @@
+Job Title: Senior Genesys Cloud Engineer
+Location: Remote with occasional travel
+Experience Required: 7-10 years
+Job Type: Full-Time
+
+About the Role:
+We are seeking an experienced Genesys Cloud Engineer with strong expertise in contact center technologies and cloud solutions. The ideal candidate will have extensive experience working with Genesys Cloud platforms, API integrations, and enterprise voice & media domains to support our growing client base in the North American region.
+
+Key Responsibilities:
+- Provide diagnostic support and technical expertise for Genesys Cloud implementations
+- Configure and customize Genesys Cloud solutions for enterprise clients
+- Develop integrations between Genesys Cloud and CRM platforms such as Salesforce
+- Troubleshoot complex issues related to voice routing, SIP, and chat functionalities
+- Support L2/L3 issues for Genesys E-services (email, chat) platforms
+- Architect and implement Genesys Cloud solutions for clients across various industries
+- Collaborate with cross-functional teams to meet SLAs and resolve critical incidents
+
+Required Skills & Experience:
+- 8+ years of experience in contact center technologies
+- Proven expertise with Genesys Cloud platforms and APIs
+- Experience with Genesys Cloud WFM, Scripting, and Quality Management
+- Knowledge of SIP protocols and troubleshooting
+- Familiarity with SQL databases and management
+- Experience working with cloud technologies including AWS
+- ITIL certification or knowledge of IT service management practices
+- Experience with Salesforce CRM integrations
+- Background in handling high-severity customer-facing issues
+
+Preferred Qualifications:
+- Genesys Cloud Certified Professional
+- Experience with conversational AI platforms like Google Dialogflow
+- Background with Avaya Communication Manager
+- Hands-on experience with Windows Server and Linux environments
+- Knowledge of PowerShell scripting
+- Experience with Docker containerization concepts
+- Networking expertise related to voice and media solutions
+
+Soft Skills:
+- Strong client communication abilities
+- Excellent problem-solving and analytical thinking
+- Ability to work under pressure and meet SLAs
+- Team collaboration and leadership skills
+
+Why Join Us:
+- Opportunity to work with enterprise-level clients across North America
+- Collaborative work environment that values technical expertise
+- Continuous learning and professional development opportunities
+- Competitive compensation package with advancement potential 

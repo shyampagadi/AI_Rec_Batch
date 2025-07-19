@@ -1,0 +1,73 @@
+{
+  "resume_id": "2b7d9466-51e7-4d51-a148-4d31b978c92e",
+  "s3_key": "raw/sample/Mangal Singh Sharma_7 Years_Performance Tester_Hyderabad.doc",
+  "original_filename": "Mangal Singh Sharma_7 Years_Performance Tester_Hyderabad.doc",
+  "file_type": "doc",
+  "llm_output": {
+    "resume_id": "2b7d9466-51e7-4d51-a148-4d31b978c92e",
+    "full_name": "Mangal Singh Sharma",
+    "email": "mangalsingh.fp9864@gmail.com",
+    "phone_number": "+91 9985391803",
+    "linkedin": "",
+    "address": "",
+    "summary": "Performance Test Engineer with 7 years of total experience. Expertise in performance testing, load testing. Expert at identifying performance bottlenecks and optimizing the system performance to ensure high-quality software delivery.Strong analytical and problem-solving skills with a track record of successful project completions.",
+    "skills": [
+      "Performance Testing Tools",
+      "LoadRunner",
+      "Apache JMeter",
+      "Monitoring Tools",
+      "Grafana",
+      "AWS performance insights",
+      "cloudwatch",
+      "Profiling Tools",
+      "Dynatrace",
+      "DB tools",
+      "Postgres",
+      "OracleDB",
+      "Other Tools",
+      "SOAP UI",
+      "Postman",
+      "Protocols",
+      "Web HTTP/HTML",
+      "Web services",
+      "FTP",
+      "TruClient"
+    ],
+    "positions": [
+      "Performance Test Engineer"
+    ],
+    "companies": [
+      {
+        "name": "Amdocs",
+        "duration": "January 2022 - PRESENT",
+        "description": "Conducted performance testing for various Amdocs products, ensuring optimal performance and scalability."
+      },
+      {
+        "name": "Indigen Technologies",
+        "duration": "January 2018 - December 2021",
+        "description": "Involved in POC (Proof of Concept) for technical feasibility for tools and protocols. Participated in Study and walked through the Non-Functional Requirements."
+      }
+    ],
+    "education": [
+      {
+        "degree": "B.Tech",
+        "institution": "JNTU Hyderabad, Aurora Engineering College",
+        "year": "2012-2016"
+      }
+    ],
+    "certifications": [],
+    "achievements": [],
+    "industries": [
+      "Software",
+      "Technology"
+    ],
+    "opensearch_success": true,
+    "processing_time": 9.040997505187988,
+    "s3_key": "raw/sample/Mangal Singh Sharma_7 Years_Performance Tester_Hyderabad.doc",
+    "file_type": "doc",
+    "original_filename": "Mangal Singh Sharma_7 Years_Performance Tester_Hyderabad.doc"
+  },
+  "timestamp": "2025-05-24 21:22:25",
+  "model_id": "meta.llama3-70b-instruct-v1:0",
+  "processing_time": 14.324999332427979
+}

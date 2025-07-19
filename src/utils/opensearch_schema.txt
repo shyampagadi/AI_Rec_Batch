@@ -1,0 +1,135 @@
+PUT /resume-embeddings
+{
+  "settings": {
+    "index": {
+      "knn": true,
+      "knn.algo_param.ef_search": 1024,
+      "analysis": {
+        "normalizer": {
+          "lowercase": {
+            "type": "custom",
+            "filter": ["lowercase"]
+          }
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "resume_id": {
+        "type": "keyword"
+      },
+      "resume_embedding": {
+        "type": "knn_vector",
+        "dimension": 1024,
+        "method": {
+          "name": "hnsw",
+          "engine": "nmslib",
+          "space_type": "cosinesimil",
+          "parameters": {
+            "ef_construction": 1024,
+            "m": 48
+          }
+        }
+      },
+      "summary": {
+        "type": "text"
+      },
+      "total_experience": {
+        "type": "float"
+      },
+      "skills": {
+        "type": "keyword",
+        "normalizer": "lowercase"
+      },
+      "positions": {
+        "type": "keyword"
+      },
+      "companies": {
+        "type": "nested",
+        "properties": {
+          "name": {
+            "type": "keyword"
+          },
+          "duration": {
+            "type": "text"
+          },
+          "description": {
+            "type": "text"
+          },
+          "role": {
+            "type": "keyword"
+          },
+          "technologies": {
+            "type": "keyword"
+          }
+        }
+      },
+      "education": {
+        "type": "nested",
+        "properties": {
+          "degree": {
+            "type": "keyword"
+          },
+          "institution": {
+            "type": "keyword"
+          },
+          "year": {
+            "type": "short"
+          }
+        }
+      },
+      "certifications": {
+        "type": "keyword"
+      },
+      "achievements": {
+        "type": "nested",
+        "properties": {
+          "type": {
+            "type": "keyword"
+          },
+          "description": {
+            "type": "text"
+          },
+          "metrics": {
+            "type": "text"
+          }
+        }
+      },
+      "industries": {
+        "type": "keyword"
+      },
+      "projects": {
+        "type": "nested",
+        "properties": {
+          "name": {
+            "type": "text"
+          },
+          "description": {
+            "type": "text"
+          },
+          "technologies": {
+            "type": "keyword"
+          },
+          "duration_months": {
+            "type": "short"
+          },
+          "role": {
+            "type": "keyword"
+          },
+          "metrics": {
+            "type": "text"
+          }
+        }
+      },
+      "created_dt": {
+        "type": "date",
+        "format": "strict_date_optional_time"
+      },
+      "updated_dt": {
+        "type": "date",
+        "format": "strict_date_optional_time"
+      }
+    }
+  }
+}

@@ -1,0 +1,58 @@
+Job Title: Java Backend Developer – Microservices (Spring Boot)
+Location: Bangalore, India (Hybrid)
+Experience Required: 3–5 years
+Job Type: Full-Time
+
+About the Role:
+We are seeking a highly skilled Java Backend Developer with strong experience in microservices and Spring Boot to join our dynamic development team. This role involves designing, building, and maintaining scalable backend systems and collaborating closely with cross-functional teams to deliver mission-critical software features. The ideal candidate is proactive, detail-oriented, and passionate about backend engineering and performance optimization.
+
+Key Responsibilities:
+Develop and maintain scalable microservices and RESTful APIs using Java (Java 8+) and Spring Boot.
+
+Analyze and resolve production issues, conduct root cause analysis, and implement effective bug fixes.
+
+Optimize backend performance, including improving database query performance and reducing latency.
+
+Collaborate with QA, product, and business teams using Agile methodologies (standups, sprint planning).
+
+Enhance application security and contribute to feature implementation efforts.
+
+Perform code reviews, provide technical support to peers, and ensure adherence to best practices.
+
+Communicate with clients directly for requirement gathering, issue resolution, and feedback incorporation.
+
+Required Skills & Experience:
+4+ years of hands-on experience in backend development.
+
+Proficiency in Java (Core Java, Java 8) and Spring Boot.
+
+Solid understanding of Microservices architecture, RESTful API development, and MySQL/SQL.
+
+Experience with Jira, Git, CI/CD, SonarQube, Jenkins, Postman, and Maven.
+
+Exposure to JWT, JUnit, and LDAP integration.
+
+Good knowledge of Agile methodologies and DevOps tools.
+
+Preferred Qualifications:
+Bachelor’s degree in Computer Science, Engineering, or a related field.
+
+Java SE8 Programmer (Part 1) certification.
+
+Proven experience working with enterprise clients like Cisco.
+
+Recognized for outstanding contributions (e.g., Cisco Glory MVP Awards).
+
+Soft Skills:
+Strong problem-solving and analytical abilities.
+
+Effective verbal and written communication skills.
+
+Ability to work both independently and collaboratively in a team environment.
+
+Why Join Us?
+Opportunity to work on cutting-edge products in a hybrid work setting.
+
+Fast-paced, collaborative environment with emphasis on continuous learning.
+
+Recognition for high performance and innovation.

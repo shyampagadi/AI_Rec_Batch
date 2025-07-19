@@ -1,0 +1,72 @@
+{
+  "resume_id": "3d1ec6bb-b04a-4784-8d87-b50289a9f8be",
+  "s3_key": "raw/sample/Kirtinaik_Resume.pdf",
+  "original_filename": "Kirtinaik_Resume.pdf",
+  "file_type": "pdf",
+  "llm_output": {
+    "resume_id": "3d1ec6bb-b04a-4784-8d87-b50289a9f8be",
+    "full_name": "KIRTI NAIK",
+    "email": "kirtinaik88@gmail.com",
+    "phone_number": "9730145335",
+    "linkedin": "https://www.linkedin.com/in/kirti-naik374062122",
+    "address": "",
+    "summary": "Software Engineer with extensive experience in network security. Results-driven Java Developer with experience at TCPWave, specializing in bug fixing, designing, unit testing, and feature development. Skilled in working with ticketing tools, Unix environments, database management, and virtualization technologies. Strong problem-solving abilities and a keen eye for optimizing software performance.",
+    "skills": [
+      "Core Java",
+      "HTML",
+      "JS",
+      "JSP",
+      "REACT",
+      "CSS",
+      "JAVASCRIPT",
+      "JQUERY",
+      "NodeJS",
+      "AWS",
+      "Virtualization",
+      "GitHub",
+      "JIRA",
+      "Hibernate",
+      "Manual Testing"
+    ],
+    "positions": [
+      "Java ful stack developer",
+      "Full Stack developer"
+    ],
+    "companies": [
+      {
+        "name": "TCPWave pvt ltd",
+        "duration": "Aug 2023-May2024",
+        "description": "Worked on chatbot enhancements, full-stack integration, bug resolution, and feature enhancements."
+      },
+      {
+        "name": "Dr. Reddys Laboratory (Svaas Wellness Limited )",
+        "duration": "Jun 2022 – Feb 2023",
+        "description": "Worked on application development, backend and frontend development in AROM project, developed AROM feature for The Healify APP, and worked on Healify basic Libraries."
+      }
+    ],
+    "education": [
+      {
+        "degree": "PGDAC Course",
+        "institution": "CDAC",
+        "year": "September 2021 – April 2022"
+      }
+    ],
+    "certifications": [
+      "AWS course from udemy Platform"
+    ],
+    "achievements": [],
+    "industries": [
+      "Network Security",
+      "Software Development",
+      "Healthcare"
+    ],
+    "opensearch_success": true,
+    "processing_time": 11.85899043083191,
+    "s3_key": "raw/sample/Kirtinaik_Resume.pdf",
+    "file_type": "pdf",
+    "original_filename": "Kirtinaik_Resume.pdf"
+  },
+  "timestamp": "2025-05-24 21:22:16",
+  "model_id": "meta.llama3-70b-instruct-v1:0",
+  "processing_time": 22.830998420715332
+}

@@ -1,0 +1,115 @@
+{
+  "resume_id": "270a601b-e7b2-4c04-8c2a-140712f0dc2a",
+  "s3_key": "raw/Naukri_KoustavGhosh[10y_1m].pdf",
+  "original_filename": "Naukri_KoustavGhosh[10y_1m].pdf",
+  "file_type": "pdf",
+  "llm_output": {
+    "resume_id": "270a601b-e7b2-4c04-8c2a-140712f0dc2a",
+    "full_name": "Koustav Ghosh",
+    "email": "koustavghosh200@gmail.com",
+    "phone_number": "+91 8697523706",
+    "linkedin": "",
+    "address": "P.O. Samabay Pally, Bally, Howrah-711205",
+    "summary": "A result-oriented professional with over 10 years of experience in application development, service delivery, and client relationship management in the Contact Center and Enterprise voice & media domain. Proficient in Genesys Cloud APIs, Genesys Cloud Architect, Genesys Cloud WFM & QM, and other related technologies. Certified Genesys Cloud CX Specialist with a proven track record of leading teams and delivering successful projects.",
+    "skills": [
+      "Genesys Cloud API",
+      "Genesys Cloud WFM",
+      "Genesys Cloud Scripting",
+      "Genesys Cloud Architect",
+      "Genesys Cloud Quality Management",
+      "GA",
+      "GAX",
+      "OPM",
+      "Pulse",
+      "CCPulse",
+      "SQL Database Management",
+      "IIS",
+      "SIP",
+      "Call Routing (URS, ORS, IRD)",
+      "VoIP",
+      "AudioCodes",
+      "JSON",
+      "Genesys Workforce Management",
+      "Genesys Infomart",
+      "Avaya Communication Manager",
+      "Batch Scripting and Power Shell ISE",
+      "Docker Concepts",
+      "Windows Server (2003, 2008)",
+      "Linux (Ubuntu)",
+      "AWS (Amazon Connect, EC2, S3, EBS, VPC)",
+      "SQL Server (2012, 2016)",
+      "Networking"
+    ],
+    "positions": [
+      "Lead Engineer",
+      "Senior Integration Developer",
+      "Senior Technical Consultant",
+      "Genesys Consultant",
+      "IT Analyst"
+    ],
+    "companies": [
+      {
+        "name": "ConvergeOne (C1)",
+        "duration": "April 2024 – Present",
+        "description": "Working as a Genesys Cloud Diagnostic Engineer for 40 + clients based out of North American region."
+      },
+      {
+        "name": "Cirruslabs (ATBZ Services Pvt Ltd)",
+        "duration": "August 2023 – April 2024",
+        "description": "Working as a Genesys Developer for an elite health insurance provider in US."
+      },
+      {
+        "name": "Conn3ct Managed Services (UK) Ltd",
+        "duration": "November 2020 – August 2023",
+        "description": "L2 / L3 support for Genesys E-services (email, chat)."
+      },
+      {
+        "name": "Moksa Technologies Pvt Ltd",
+        "duration": "November 2019 – November 2020",
+        "description": "Worked on SIP functionalities and troubleshooting various call flow problems via SIP logs."
+      },
+      {
+        "name": "Tata Consultancy Services, Kolkata",
+        "duration": "March 2015 – October 2019",
+        "description": "Participate in Bridge Lines for Sev1 customer facing issues and drive the issue to resolution by meeting SLA’s along with Major Incident Management Team."
+      }
+    ],
+    "education": [
+      {
+        "degree": "B.Tech in Electronics and Communications Engineering",
+        "institution": "West Bengal University Of Technology",
+        "year": 2014
+      }
+    ],
+    "certifications": [
+      "Genesys Cloud Certified Professional",
+      "Genesys Cloud CX Architect",
+      "Genesys Cloud Outbound",
+      "Genesys Cloud Scripting",
+      "Genesys Cloud Workforce Management",
+      "Genesys Cloud Quality Management",
+      "ITIL V3 2011 Foundation Certified"
+    ],
+    "achievements": [
+      "Key Highlights: Genesys Cloud architect call flow and email flow designing for different contact center LOBs.",
+      "Integrating Salesforce CRM with Genesys Cloud for creating new case IDs for every new inbound interaction.",
+      "Applying GET API to fetch customer data from Salesforce.",
+      "POST conversation data for every inbound and outbound calls or email interactions.",
+      "Get Architect flows via API calls and perform actions such as check-in, check-out, de-activate, revert, unlock, and publish on any flows.",
+      "Initiate a Call from Your Genesys Cloud CX Environment Using API."
+    ],
+    "industries": [
+      "Contact Center",
+      "Enterprise voice & media domain",
+      "Health Insurance"
+    ],
+    "opensearch_success": true,
+    "processing_time": 23.10199213027954,
+    "s3_key": "raw/Naukri_KoustavGhosh[10y_1m].pdf",
+    "file_type": "pdf",
+    "original_filename": "Naukri_KoustavGhosh[10y_1m].pdf"
+  },
+  "timestamp": "2025-05-24 21:22:20",
+  "model_id": "meta.llama3-70b-instruct-v1:0",
+  "processing_time": 26.917009830474854
+}

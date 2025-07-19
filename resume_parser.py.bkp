@@ -1,0 +1,2891 @@
+from src.config import *
+from src.logging_utils import safe_log
+import re
+import json
+import boto3
+import time
+import tempfile
+import traceback
+from datetime import datetime
+import unicodedata
+import os
+import threading
+from botocore.exceptions import ClientError
+from src.debug_helper import save_debug_file, inspect_json_string, clean_json_response, extract_json_from_llm_response
+from src.prompts.prompt import RESUME_PARSING_PROMPT
+
+# Thread-local storage for parsed resume data to ensure thread safety
+# This is essential for parallel processing in AWS Batch environments
+_thread_local = threading.local()
+
+
+def clean_text_for_llm(text):
+    """Clean and prepare text for LLM processing by removing excessive whitespace,
+    normalizing newlines, and limiting length if needed"""
+    if not text:
+        return ""
+        
+    # Remove excessive whitespace
+    cleaned = re.sub(r'\s+', ' ', text)
+    
+    # Normalize newlines
+    cleaned = cleaned.replace('\r\n', '\n').replace('\r', '\n')
+    
+    # Break long paragraphs into smaller chunks
+    cleaned = re.sub(r'([.!?])\s+', r'\1\n', cleaned)
+    
+    # Remove any non-printable characters
+    cleaned = ''.join(c for c in cleaned if c.isprintable() or c == '\n')
+    
+    # Add some structure to improve LLM understanding
+    cleaned = cleaned.replace('\n\n', '\n').replace('\n', '\n\n')
+    
+    # Limit length if needed (most LLMs have token limits)
+    max_chars = 30000  # Approximate limit to prevent context overflow
+    if len(cleaned) > max_chars:
+        safe_log(f"Text too long ({len(cleaned)} chars), truncating to {max_chars}", level='warning')
+        cleaned = cleaned[:max_chars] + "\n\n[... Text truncated due to length ...]\n"
+        
+    return cleaned
+
+# Regex patterns and helpers (import or define as needed)
+from src.utils.regex_patterns import (
+    EMAIL_PATTERNS, PHONE_PATTERNS, LINKEDIN_PATTERNS, NAME_PATTERNS, ADDRESS_PATTERNS,
+    clean_phone_number, clean_linkedin_url, extract_name_from_filename, clean_email
+)
+
+def call_llm(prompt, test_mode=False, raw_text=None, file_path=None, retry_count=0, max_retries=3):
+    """LLM API call for resume parsing using Amazon Bedrock with enhanced retry logic and chain-of-thought prompting"""
+    safe_log(f"Generating resume parsing response with Amazon Bedrock (attempt {retry_count+1}/{max_retries+1})", level='info')
+    
+    # Use Amazon Bedrock with Llama model
+    bedrock_client = boto3.client(
+        service_name='bedrock-runtime', 
+        region_name=AWS_REGION
+    )
+    
+    # Get model name for parameter format selection
+    model_name = MODEL_ID.lower() if MODEL_ID else ""
+    
+    # Log the detected model info
+    safe_log(f"Using model: {MODEL_ID}", level='debug')
+    
+    # Adjust temperature based on retry count - start more deterministic, then get more creative if failing
+    temperature = 0.1 + (retry_count * 0.1)  # 0.1 for first try, increase with each retry
+    
+    # If this is a retry, enhance the prompt to address potential issues
+    if retry_count > 0:
+        # Add specific instructions based on the retry number
+        if retry_count == 1:
+            prompt += "\n\nIMPORTANT: Please ensure you're identifying ALL contact information including LinkedIn URL, email, and phone number. Be thorough in extracting company names and employment history."
+        elif retry_count == 2:
+            prompt += "\n\nCRITICAL: You seem to be missing some key information. Double-check for LinkedIn profile URLs, complete company names (e.g., 'Infosys Limited'), and ensure ALL education details are captured. Review the text carefully for these elements."
+        elif retry_count == 3:
+            prompt += "\n\nFINAL ATTEMPT: This is your last chance to extract ALL information from this resume. If information appears ambiguous or implicit, make reasonable inferences. Pay special attention to education history, work experience with ALL company names, and ALL contact details including LinkedIn."
+    
+    safe_log(f"Using temperature: {temperature} for attempt {retry_count+1}", level='debug')
+    
+    # Using model-specific formats based on AWS documentation
+    if "llama3" in model_name:
+        # Format according to meta.llama3-70b-instruct-v1 needs
+        system_prompt = "You are a high-precision resume parser that extracts structured information from resumes."
+        formatted_prompt = f"<s>[INST] <<SYS>>\n{system_prompt}\n<</SYS>>\n\n{prompt}[/INST]"
+        request_body = {
+            "prompt": formatted_prompt,
+            "max_gen_len": 4096,
+            "temperature": temperature,
+            "top_p": 0.9
+        }
+        safe_log("Using Llama3 format", level='debug')
+        print(f"DEBUG - Request body format: Llama3")
+    # Llama2 model format
+    elif "llama2" in model_name:
+        request_body = {
+            "prompt": prompt,
+            "max_gen_len": 4096,
+            "temperature": 0.2,
+            "top_p": 0.9
+        }
+        safe_log("Using Llama2 format", level='debug')
+    # Claude model format
+    elif "claude" in model_name:
+        request_body = {
+            "prompt": prompt,
+            "max_tokens_to_sample": 4096,
+            "temperature": 0.2,
+            "top_p": 0.9
+        }
+        safe_log("Using Claude format", level='debug')
+    # Titan model format
+    elif "titan" in model_name:
+        request_body = {
+            "inputText": prompt,
+            "textGenerationConfig": {
+                "maxTokenCount": 4096,
+                "temperature": 0.2,
+                "topP": 0.9
+            }
+        }
+        safe_log("Using Titan format", level='debug')
+    # Fallback for any other model
+    else:
+        safe_log("Using generic format for unrecognized model", level='debug')
+        request_body = {
+            "prompt": prompt,
+            "temperature": 0.2,
+            "top_p": 0.9,
+            "max_tokens": 4096
+        }
+    
+    # Invoke the Bedrock model
+    try:
+        print(f"DEBUG - Invoking model with request: {json.dumps(request_body)[:200]}...")
+        # Try to invoke the model, but gracefully handle validation errors
+        try:
+            response = bedrock_client.invoke_model(
+                modelId=MODEL_ID,
+                contentType='application/json',
+                accept='application/json',
+                body=json.dumps(request_body)
+            )
+        except Exception as model_error:
+            # If we get a validation error, we'll gracefully handle it and return a simulated response
+            # This allows us to continue using the specified model ID while testing other code paths
+            safe_log(f"Error calling Bedrock API: {str(model_error)}", level='error')
+            # Simulate a successful response for testing purposes
+            if test_mode:
+                safe_log("Using test mode simulated response", level='info')
+                if raw_text:
+                    # Use raw_text to extract meaningful data without LLM
+                    return {}, raw_text
+                else:
+                    # If no raw_text, attempt to extract content from file_path
+                    if file_path:
+                        if file_path.lower().endswith('.pdf'):
+                            extracted_text = extract_text_from_pdf(file_path)
+                        elif file_path.lower().endswith('.docx'):
+                            extracted_text = extract_text_from_docx(file_path)
+                        elif file_path.lower().endswith('.doc'):
+                            extracted_text = extract_text_from_doc(file_path)
+                        else:
+                            extracted_text = ""
+                        return {}, extracted_text
+            # In production mode, re-raise to trigger fallback extraction
+            raise
+        
+        # Get the response
+        response_body = json.loads(response['body'].read().decode('utf-8'))
+        print(f"DEBUG - Raw Bedrock response: {str(response_body)}")
+        
+        # Print raw response for debugging
+        safe_log(f"Raw response from Bedrock: {str(response_body)}", level='debug')
+        
+        # Store the raw response body for better extraction
+        raw_response_body = response_body
+        
+        # Extract text based on model
+        if "llama3" in model_name:
+            # According to AWS documentation, Llama3 returns a "generation" field
+            if 'generation' in response_body:
+                raw_text_response = response_body['generation']
+                print(f"DEBUG - Found generation field: {raw_text_response[:200]}...")
+            else:
+                # Fallback to any available field
+                raw_text_response = (
+                    response_body.get('text', '') or
+                    response_body.get('output', '') or
+                    response_body.get('response', '') or
+                    response_body.get('content', '')
+                )
+                print(f"DEBUG - Using fallback fields: {raw_text_response[:200]}...")
+        else:
+            # For Llama2 and others
+            raw_text_response = (
+                response_body.get('generation', '') or
+                response_body.get('text', '') or
+                response_body.get('output', '') or
+                response_body.get('response', '') or
+                response_body.get('content', '')
+            )
+        
+        # Pass the raw response body for extraction in parse_resume
+        return raw_response_body, raw_text_response
+        
+    except Exception as e:
+        safe_log(f"Error calling Bedrock API: {str(e)}", level='error')
+        print(f"DEBUG - Bedrock API error: {str(e)}")
+        # Re-raise to be handled by caller
+        raise
+
+def parse_resume(file_path, raw_text=None, test_mode=False):
+    """Parse a resume file and return structured data using LLM with chain-of-thought prompting, multi-retry logic and fallback extraction"""
+    safe_log(f"Parsing resume: {file_path}", level='info')
+    
+    # Get raw text first - handle both cases when text is provided or needs to be extracted
+    if raw_text is None:
+        # Extract text based on file type
+        if file_path.lower().endswith('.pdf'):
+            raw_text = extract_text_from_pdf(file_path)
+        elif file_path.lower().endswith('.docx'):
+            raw_text = extract_text_from_docx(file_path)
+        elif file_path.lower().endswith('.doc'):
+            raw_text = extract_text_from_doc(file_path)
+        else:
+            safe_log(f"Unsupported file type: {file_path}", level='warning')
+            return None, None
+    
+    if not raw_text or not raw_text.strip():
+        safe_log(f"No text extracted from {file_path}", level='warning')
+        return None, None
+        
+    # Prepare and clean text for LLM processing
+    text_for_llm = clean_text_for_llm(raw_text)
+    
+    # Define helper functions for validating parsed data
+    def is_valid_parsed_data(data):
+        """Check if all essential fields in parsed data are filled with meaningful values"""
+        if not data or not isinstance(data, dict):
+            return False
+            
+        # Check essential fields have valid values
+        essential_fields = ['name', 'email', 'phone_number', 'linkedin_url', 'companies', 'education']
+        for field in essential_fields:
+            if field not in data or not data[field] or data[field] == "Not provided":
+                return False
+                
+        # Additional validation for list fields
+        list_fields = ['companies', 'education', 'skills']
+        for field in list_fields:
+            if field in data and (not isinstance(data[field], list) or len(data[field]) == 0):
+                return False
+                
+        return True
+        
+    def get_missing_fields(data):
+        """Identify which essential fields are missing from parsed data"""
+        missing = []
+        if not data or not isinstance(data, dict):
+            return "All fields"
+            
+        essential_fields = [
+            'name', 'email', 'phone_number', 'linkedin_url', 'summary', 
+            'companies', 'skills', 'education', 'total_years_experience'
+        ]
+        
+        for field in essential_fields:
+            if field not in data or not data[field] or data[field] == "Not provided" or data[field] == []:
+                missing.append(field)
+                
+        return ", ".join(missing) if missing else "None"
+    
+    # Track if we're using the fallback approach or primary LLM parsing
+    using_fallback = False
+    parsed_data = None
+    
+    try:
+        # Implement multi-retry logic with increasing guidance on each attempt
+        max_retries = 2  # 3 total attempts (initial + 2 retries)
+        last_error = None
+        best_parsed_data = None  # Store the best data we've seen so far
+        
+        # Attempt parsing with increasing levels of guidance
+        for retry_count in range(max_retries + 1):
+            try:
+                # Generate prompt with appropriate guidance based on retry count
+                prompt = get_llm_flat_prompt(text_for_llm)
+                safe_log(f"Sending prompt for {file_path} to LLM (Attempt {retry_count+1}/{max_retries+1})", level='debug')
+                
+                # Call LLM with retry information
+                llm_output, _ = call_llm(prompt, raw_text=raw_text, file_path=file_path, retry_count=retry_count, max_retries=max_retries, test_mode=test_mode)
+                
+                # Parse the LLM response
+                current_parsed_data = parse_llm_response(llm_output, raw_text, file_path)
+                
+                # Preserve the result regardless, so we can use the best available data if all retries fail
+                if current_parsed_data:
+                    if best_parsed_data is None:
+                        best_parsed_data = current_parsed_data
+                    else:
+                        # Merge data from all attempts, keeping the most complete information
+                        # For each field in the current attempt
+                        for field, value in current_parsed_data.items():
+                            # Check if the field exists and has valid content
+                            if value and value != "Not provided" and value != []:
+                                # If this field doesn't exist in our best data or is empty there
+                                if field not in best_parsed_data or not best_parsed_data[field] or best_parsed_data[field] == "Not provided" or best_parsed_data[field] == []:
+                                    best_parsed_data[field] = value
+                                    safe_log(f"Added {field} from attempt {retry_count+1}", level='info')
+                                # Special handling for list fields - merge them if both have content
+                                elif isinstance(value, list) and isinstance(best_parsed_data[field], list):
+                                    # Merge lists while avoiding duplicates
+                                    for item in value:
+                                        if item not in best_parsed_data[field]:
+                                            best_parsed_data[field].append(item)
+                                    safe_log(f"Merged {field} from attempt {retry_count+1}", level='info')
+                
+                # Use the current data for validation
+                parsed_data = current_parsed_data
+                
+                # If we got valid data and all essential fields are populated, break the retry loop
+                if parsed_data and is_valid_parsed_data(parsed_data):
+                    safe_log(f"Successfully parsed resume data on attempt {retry_count+1}", level='info')
+                    break
+                else:
+                    # Log what fields are missing to guide the next retry
+                    missing_fields = get_missing_fields(parsed_data) if parsed_data else "all fields"
+                    safe_log(f"Incomplete data from LLM on attempt {retry_count+1}. Missing: {missing_fields}", level='warning')
+            
+            except Exception as e:
+                last_error = e
+                safe_log(f"Error in LLM parsing (attempt {retry_count+1}): {str(e)}", level='error')
+                continue  # Try again with next retry if we have retries left
+        
+        # After all retries, if we have any successful parsed data but it wasn't valid enough to break the loop,
+        # use the best data we collected
+        if not parsed_data and best_parsed_data:
+            safe_log(f"Using best available parsed data after {max_retries+1} attempts", level='info')
+            parsed_data = best_parsed_data
+            
+    except Exception as outer_e:
+        safe_log(f"Error in multi-retry parsing process: {str(outer_e)}", level='error')
+        # Fall through to fallback extraction
+        
+    # If we still don't have valid data after retries, use fallback extraction
+    if not parsed_data or not is_valid_parsed_data(parsed_data):
+        safe_log(f"Using fallback extraction for {file_path} after {max_retries+1} LLM attempts", level='info')
+        using_fallback = True
+        
+        # Use regex-based extraction as a fallback
+        parsed_data = extract_data_from_raw_text(raw_text, file_path)
+    
+    # Always validate and enrich the output - for both LLM and fallback methods
+    if parsed_data:
+        # Apply validation function to ensure mandatory fields
+        summary, skills, positions, industries, projects = validate_mandatory_fields(
+            parsed_data, parsed_data.get('name', "Candidate")
+        )
+        
+        # Update with validated fields
+        parsed_data['summary'] = summary
+        parsed_data['skills'] = skills
+        parsed_data['positions'] = positions
+        parsed_data['industries'] = industries
+        parsed_data['projects'] = projects
+        
+        # Add a last_updated timestamp
+        parsed_data['last_updated'] = datetime.now().isoformat()
+        
+        # Return result and the raw_text for reference
+        return parsed_data, raw_text
+    else:
+        # If we have no data at this point, return none
+        safe_log(f"All parsing methods failed for {file_path}", level='error')
+        return None, None
+
+
+def extract_json_pattern_manually(response_text):
+    """Direct extraction of fields using regex patterns for when JSON is truncated"""
+    import re
+    import json
+    
+    # Initialize an empty result dictionary
+    result = {}
+    
+    # Regular expressions for common fields
+    patterns = {
+        'full_name': r'"full_name"\s*:\s*"([^"]+)"',
+        'email': r'"email"\s*:\s*"([^"]+)"',
+        'phone_number': r'"phone_number"\s*:\s*"([^"]+)"',
+        'address': r'"address"\s*:\s*"([^"]+)"',
+        'linkedin': r'"linkedin"\s*:\s*"([^"]+)"',
+        'summary': r'"summary"\s*:\s*"([^"]+)"',
+        'total_experience': r'"total_experience"\s*:\s*([\d\.]+)',
+    }
+        
+    # Extract arrays using a different pattern approach
+    array_patterns = {
+        'positions': r'"positions"\s*:\s*\[([^\]]+)\]',
+        'skills': r'"skills"\s*:\s*\[([^\]]+)\]',
+    }
+        
+    # Extract scalar fields
+    for field, pattern in patterns.items():
+        match = re.search(pattern, response_text)
+        if match:
+            # For numeric fields, convert to appropriate type
+            if field == 'total_experience':
+                try:
+                    result[field] = float(match.group(1))
+                except (ValueError, TypeError):
+                    result[field] = 0
+            else:
+                result[field] = match.group(1)
+        
+    # Extract array fields
+    for field, pattern in array_patterns.items():
+        match = re.search(pattern, response_text)
+        if match:
+            raw_array = match.group(1)
+            # Try to parse the array elements
+            try:
+                # Handle quoted items like "item1", "item2"
+                items = re.findall(r'"([^"]+)"', raw_array)
+                if items:
+                    result[field] = items
+            except Exception as e:
+                safe_log(f"Error parsing array field {field}: {str(e)}", level='error')
+    
+    # More complex nested objects
+    # Extract education
+    education_pattern = r'"education"\s*:\s*\[\s*\{([^\}]+)\}\s*\]'
+    education_match = re.search(education_pattern, response_text, re.DOTALL)
+    if education_match:
+        education_raw = education_match.group(1)
+        # Extract each field from education
+        degree = re.search(r'"degree"\s*:\s*"([^"]+)"', education_raw)
+        institution = re.search(r'"institution"\s*:\s*"([^"]+)"', education_raw)
+        year = re.search(r'"year"\s*:\s*(\d+)', education_raw)
+        
+        education_item = {}
+        if degree: education_item['degree'] = degree.group(1)
+        if institution: education_item['institution'] = institution.group(1)
+        if year: education_item['year'] = int(year.group(1))
+
+        if education_item:
+            result['education'] = [education_item]
+    
+    return result
+
+
+def parse_llm_response(llm_output, raw_text, file_path):
+    """Parse the LLM response to extract structured resume data
+    
+    This function handles response processing from the LLM, extracting JSON, and 
+    ensures we get properly structured data even if the JSON is malformed.
+    """
+    safe_log(f"Parsing LLM response for {file_path}", level='debug')
+    
+    try:
+        # First try to find valid JSON in the response using our extraction helper
+        parsed_json = extract_json_from_llm_response(llm_output)
+        
+        if parsed_json and isinstance(parsed_json, dict):
+            # Successful JSON extraction
+            safe_log(f"Successfully extracted structured JSON from LLM response for {file_path}", level='info')
+            
+            # Ensure the required fields are present and properly formatted
+            parsed_json = normalize_parsed_data(parsed_json)
+            return parsed_json
+        else:
+            # Fall back to pattern matching if we failed to get valid JSON
+            safe_log(f"Failed to extract valid JSON from LLM response, trying pattern matching for {file_path}", level='warning')
+            extracted_data = extract_json_pattern_manually(llm_output)
+            
+            if extracted_data and len(extracted_data) > 3:  # At least a few fields must be present
+                safe_log(f"Successfully extracted data via pattern matching for {file_path}", level='info')
+                return normalize_parsed_data(extracted_data)
+            else:
+                safe_log(f"Pattern matching extraction failed for {file_path}", level='warning')
+                return None
+    
+    except Exception as e:
+        safe_log(f"Error parsing LLM response: {str(e)}", level='error')
+        import traceback
+        safe_log(f"Traceback: {traceback.format_exc()[:500]}", level='debug')
+        return None
+
+
+def normalize_parsed_data(parsed_data):
+    """Normalize parsed data to ensure consistent structure"""
+    # Create a copy to avoid modifying the original
+    result = parsed_data.copy() if parsed_data else {}
+    
+    # Normalize field names
+    field_mappings = {
+        'full_name': 'name',
+        'phone': 'phone_number',
+        'linkedin': 'linkedin_url',
+        'total_experience': 'total_years_experience'
+    }
+    
+    # Apply field name mappings
+    for source, target in field_mappings.items():
+        if source in result and source != target:
+            result[target] = result.pop(source)
+    
+    # Ensure all required fields are present
+    required_fields = ['name', 'email', 'phone_number', 'address', 'linkedin_url', 'summary', 'skills', 
+                      'total_years_experience', 'positions', 'companies', 'education']
+    
+    for field in required_fields:
+        if field not in result or result[field] is None:
+            if field in ['skills', 'positions', 'companies', 'education']:
+                result[field] = []
+            elif field == 'total_years_experience':
+                result[field] = 0
+            else:
+                result[field] = "Not provided"
+    
+    return result
+
+
+# Validation function at global scope to make it accessible from multiple codepaths
+def validate_mandatory_fields(parsed_data, name):
+    """Ensure all mandatory fields have proper content, generating it when needed"""
+    # Summary validation - must be a proper professional summary, not 'Not provided'
+    summary = parsed_data.get('summary', "") 
+    if not summary or summary == "Not provided":
+        # Generate a professional summary based on available information
+        skills_text = ", ".join(parsed_data.get('skills', [])[:5]) if parsed_data.get('skills') else "various skills"
+        companies_text = ", ".join(c.get('name', c) if isinstance(c, dict) else c for c in parsed_data.get('companies', [])[:2]) if parsed_data.get('companies') else ""
+        positions_text = ", ".join(parsed_data.get('positions', [])[:2]) if parsed_data.get('positions') else ""
+        exp_years = parsed_data.get('total_experience', parsed_data.get('total_years_experience', 0))
+        
+        if companies_text and positions_text:
+            summary = f"Professional with {exp_years} years of experience as {positions_text} at {companies_text}, specializing in {skills_text}."
+        elif positions_text:
+            summary = f"Professional with {exp_years} years of experience as {positions_text}, with expertise in {skills_text}."
+        elif companies_text:
+            summary = f"Professional with {exp_years} years of experience at {companies_text}, with skills in {skills_text}."
+        else:
+            summary = f"Professional with expertise in {skills_text} looking to leverage technical skills in a challenging role."
+    
+    # Ensure other mandatory fields are populated
+    skills = parsed_data.get('skills', [])
+    if not skills:
+        # Extract potential skills from the raw text or other fields
+        potential_skills = []
+        for tech_term in ["java", "python", "c++", "javascript", "html", "css", "sql", "cloud", "aws", "azure",
+                        "spring", "react", "angular", "node", "devops", "git", "jenkins", "docker", "kubernetes",
+                        "agile", "scrum", "machine learning", "data science", "analytics"]:
+            if tech_term in str(parsed_data).lower():
+                potential_skills.append(tech_term.title())
+        skills = potential_skills[:10] if potential_skills else ["Technical skills", "Problem Solving", "Communication"]
+    
+    # Validate positions
+    positions = parsed_data.get('positions', [])
+    if not positions:
+        # Infer positions from other fields
+        if "engineer" in str(parsed_data).lower() or "developer" in str(parsed_data).lower():
+            positions = ["Software Engineer"]
+        elif "analyst" in str(parsed_data).lower():
+            positions = ["Business Analyst"]
+        elif "manager" in str(parsed_data).lower():
+            positions = ["Project Manager"]
+        else:
+            positions = ["Professional"]
+    
+    # Validate industries
+    industries = parsed_data.get('industries', [])
+    if not industries:
+        # Infer industries from skills and other fields
+        if any(tech in str(skills).lower() for tech in ["java", "python", "javascript", "react", "angular"]):
+            industries = ["Information Technology", "Software Development"]
+        elif any(term in str(parsed_data).lower() for term in ["finance", "bank", "investment"]):
+            industries = ["Finance", "Banking"]
+        elif any(term in str(parsed_data).lower() for term in ["health", "medical", "pharma"]):
+            industries = ["Healthcare", "Pharmaceuticals"]
+        else:
+            industries = ["Technology", "Business Services"]
+    
+    # Validate projects
+    projects = parsed_data.get('projects', [])
+    if not projects:
+        # Create at least one project based on available information
+        if parsed_data.get('companies'):
+            company = parsed_data.get('companies')[0]
+            company_name = company.get('name', company) if isinstance(company, dict) else company
+            projects = [
+                {
+                    "name": f"Core System Development at {company_name}",
+                    "description": f"Worked on development and maintenance of core systems, improving efficiency and reliability",
+                    "company": company_name,
+                    "technologies": ", ".join(skills[:5]) if skills else "Various technologies"
+                }
+            ]
+        else:
+            projects = [
+                {
+                    "name": "Technical Project",
+                    "description": "Development and implementation of technical solutions to address business requirements",
+                    "company": "Previous Employer",
+                    "technologies": ", ".join(skills[:5]) if skills else "Various technologies"
+                }
+            ]
+    
+    return summary, skills, positions, industries, projects
+    
+    # Apply validation to ensure all mandatory fields are properly populated
+    summary, skills, positions, industries, projects = validate_mandatory_fields(
+        parsed_data, 
+        parsed_data.get('full_name', parsed_data.get('name', "Candidate"))
+    )
+    
+    # Ensure proper handling of fields based on LLM schema
+    result = {
+        'name': parsed_data.get('full_name', parsed_data.get('name', "Not provided")),
+        'email': get_field_value('email'),
+        'phone_number': get_field_value('phone_number'),
+        'address': get_field_value('address'),
+        'linkedin_url': parsed_data.get('linkedin', "Not provided"),
+        'summary': summary,
+        'total_years_experience': experience_value,  # We use only this field for experience
+        'skills': skills,
+        'positions': positions,
+        'companies': companies,
+        'education': parsed_data.get('education', []),
+        'industries': industries,
+        'projects': projects,
+        'certifications': parsed_data.get('certifications', []),
+        'achievements': parsed_data.get('achievements', []),  # Make sure we capture achievements
+        'last_updated': datetime.now().isoformat()
+    }
+    
+    # professional_data field has been removed as it's not in our prompt schema
+    
+    safe_log(f"Successfully parsed resume data with fields: {list(result.keys())}", level='debug')
+    
+    # Clean up thread-local storage to prevent memory leaks and ensure clean state for next resume
+    # This is critical for batch processing in AWS Batch where resources are reused
+    if hasattr(_thread_local, 'parsed_resume'):
+        del _thread_local.parsed_resume
+    
+    # If we got dummy data, raise an error
+    if result['name'] == "John Doe" and result['email'] == "john@example.com":
+        raise ValueError("Detected dummy data from Bedrock API response")
+        
+    return result, raw_text
+
+# Import PyPDF2 for PDF processing
+import PyPDF2
+
+def get_llm_flat_prompt(resume_text):
+    """Format and return the prompt for LLM with the resume text safely inserted"""
+    # Create the full prompt with resume text inserted
+    from src.prompts.prompt import RESUME_PARSING_PROMPT
+    
+    # Limit the resume text length to avoid token limit errors (approximately 6000 tokens max)
+    # Most important info is at the beginning of the resume, so we prioritize that
+    max_text_length = 12000  # Characters, not tokens, but this is a reasonable estimate
+    
+    if len(resume_text) > max_text_length:
+        safe_log(f"Truncating resume text from {len(resume_text)} to {max_text_length} characters to avoid token limit errors", level='warning')
+        resume_text = resume_text[:max_text_length] + "\n\n[Note: Resume text was truncated due to length constraints. Focus on extracting information from the provided portion.]"
+    
+    # Replace the placeholder with the actual resume text
+    full_prompt = RESUME_PARSING_PROMPT.replace("{resume_text}", resume_text)
+    
+    return full_prompt
+
+def extract_text_from_pdf(file_path):
+    """Extract text from PDF files"""
+    text = ""
+    try:
+        with open(file_path, 'rb') as f:
+            reader = PyPDF2.PdfReader(f)
+            text = "\n".join(page.extract_text() or '' for page in reader.pages)
+        return text
+    except Exception as e:
+        safe_log(f"Error extracting text from PDF {file_path}: {str(e)}", level='error')
+        return ""
+
+def extract_text_from_docx(file_path):
+    """Extract text from DOCX files with improved structure recognition
+    Handles paragraphs, tables, headers, and other document elements"""
+    try:
+        import docx
+        from docx.table import _Cell
+        from docx.oxml.text.paragraph import CT_P
+        from docx.oxml.table import CT_Tbl
+        from docx.text.paragraph import Paragraph
+        
+        doc = docx.Document(file_path)
+        full_text = []
+        
+        # First try to identify contact information at the beginning of the document
+        contact_info = []
+        for i, para in enumerate(doc.paragraphs[:10]):  # Check first few paragraphs
+            if para.text.strip():
+                # First few non-empty paragraphs frequently contain name and contact info
+                if i < 5 and len(para.text.strip()) < 100:  # Usually name/contact is concise
+                    contact_info.append(f"CONTACT_INFO: {para.text.strip()}")
+        
+        if contact_info:
+            full_text.extend(contact_info)
+            full_text.append('\n')
+        
+        # Process all paragraphs
+        for para in doc.paragraphs:
+            if para.text.strip():
+                # Check for heading style
+                if para.style and para.style.name and para.style.name.startswith('Heading'):
+                    full_text.append('\n' + para.text.upper() + '\n')
+                else:
+                    full_text.append(para.text)
+        
+        # Process tables
+        for table in doc.tables:
+            # Table header
+            full_text.append('\nTABLE DATA:')
+            
+            for row in table.rows:
+                row_text = []
+                for cell in row.cells:
+                    cell_text = cell.text.strip()
+                    if cell_text:
+                        row_text.append(cell_text)
+                
+                if row_text:  # Only add non-empty rows
+                    full_text.append(' | '.join(row_text))
+        
+        # Process any text in headers and footers
+        for section in doc.sections:
+            if section.header:
+                for para in section.header.paragraphs:
+                    if para.text.strip():
+                        full_text.append('HEADER: ' + para.text.strip())
+                        
+            if section.footer:
+                for para in section.footer.paragraphs:
+                    if para.text.strip():
+                        full_text.append('FOOTER: ' + para.text.strip())
+        
+        result = '\n'.join(full_text)
+        safe_log(f"Successfully extracted {len(result)} characters from DOCX file", level='debug')
+        
+        # Backup extraction using python-docx2txt if the content seems insufficient
+        if len(result) < 300:  # If too short, try alternative extraction
+            try:
+                import docx2txt
+                alt_text = docx2txt.process(file_path)
+                if len(alt_text) > len(result):
+                    safe_log(f"Using alternate docx2txt extraction method (got {len(alt_text)} chars)", level='debug')
+                    return alt_text
+            except Exception as e2:
+                safe_log(f"Alternative DOCX extraction failed: {str(e2)}", level='debug')
+        
+        return result
+    
+    except Exception as e:
+        safe_log(f"Error extracting text from DOCX file: {str(e)}", level='error')
+        try:
+            # Fallback to docx2txt
+            import docx2txt
+            text = docx2txt.process(file_path)
+            safe_log(f"Successfully extracted {len(text)} characters using docx2txt fallback", level='debug')
+            return text
+        except Exception as e2:
+            safe_log(f"Error in docx2txt fallback: {str(e2)}", level='error')
+            return ""
+
+def extract_text_from_doc(file_path):
+    """Extract text content from a DOC file (MS Word 97-2003) in a cross-platform way"""
+    safe_log(f"Extracting text from DOC: {file_path}", level='debug')
+    
+    import os
+    import platform
+    import subprocess
+    import tempfile
+    import shutil
+    
+    text = ""
+    success = False
+    error_messages = []
+    
+    # Method 1: Use olefile as the primary method (works cross-platform)
+    try:
+        import olefile
+        if olefile.isOleFile(file_path):
+            # Extract text from the OLE file
+            with olefile.OleFileIO(file_path) as ole:
+                # Check if the WordDocument stream exists
+                if ole.exists('WordDocument'):
+                    # Get the WordDocument stream
+                    word_stream = ole.openstream('WordDocument')
+                    word_data = word_stream.read()
+                    
+                    # Extract text (basic approach - get printable ASCII characters)
+                    import re
+                    import string
+                    printable = set(string.printable)
+                    text = ''
+                    
+                    # First pass: extract ASCII text
+                    for i in range(0, len(word_data)):
+                        if 32 <= word_data[i] <= 126:  # ASCII printable range
+                            text += chr(word_data[i])
+                        elif word_data[i] in (10, 13):  # newlines
+                            text += '\n'
+                    
+                    # Clean up the text
+                    text = re.sub(r'[^\S\r\n]+', ' ', text)  # Replace whitespace with single space
+                    text = re.sub(r'\n\s*\n', '\n\n', text)  # Clean up multiple newlines
+                    
+                    # Try to get additional text from other streams like Table, WordDocument
+                    additional_streams = ['1Table', '0Table', 'Table']
+                    for stream in additional_streams:
+                        if ole.exists(stream):
+                            try:
+                                table_stream = ole.openstream(stream)
+                                table_data = table_stream.read()
+                                for i in range(0, len(table_data)):
+                                    if 32 <= table_data[i] <= 126:  # ASCII printable range
+                                        text += chr(table_data[i])
+                                    elif table_data[i] in (10, 13):  # newlines
+                                        text += '\n'
+                            except:
+                                pass
+                    
+                    # Clean up the text one more time
+                    text = re.sub(r'[^\S\r\n]+', ' ', text)  # Replace whitespace with single space
+                    text = re.sub(r'\n\s*\n', '\n\n', text)  # Clean up multiple newlines
+                    
+                    if len(text.strip()) > 100:  # Check if we got meaningful text
+                        safe_log(f"Successfully extracted {len(text)} characters from DOC using olefile", level='debug')
+                        success = True
+                        return text
+                    else:
+                        error_msg = "Olefile extraction produced insufficient text"
+                        error_messages.append(error_msg)
+                        safe_log(error_msg, level='warning')
+                else:
+                    error_msg = "No WordDocument stream found in the OLE file"
+                    error_messages.append(error_msg)
+                    safe_log(error_msg, level='warning')
+        else:
+            error_msg = "File is not a valid OLE file"
+            error_messages.append(error_msg)
+            safe_log(error_msg, level='warning')
+    except Exception as e:
+        error_msg = f"Olefile extraction failed: {str(e)}"
+        error_messages.append(error_msg)
+        safe_log(error_msg, level='warning')
+    
+    # Method 2: Try textract library as a fallback (in our requirements)
+    if not success:
+        try:
+            import textract
+            text = textract.process(file_path).decode('utf-8')
+            if text and len(text.strip()) > 100:  # Check if we got meaningful text
+                safe_log(f"Successfully extracted {len(text)} characters from DOC using textract", level='debug')
+                success = True
+                return text
+        except Exception as e:
+            error_msg = f"Textract extraction failed: {str(e)}"
+            error_messages.append(error_msg)
+            safe_log(error_msg, level='warning')
+    
+    # Method 3: Try subprocess with antiword (common on Linux/Unix systems)
+    if not success and platform.system() != 'Windows':
+        try:
+            result = subprocess.run(['antiword', file_path], capture_output=True, text=True, check=True)
+            text = result.stdout
+            if text and len(text.strip()) > 100:
+                safe_log(f"Successfully extracted {len(text)} characters from DOC using antiword", level='debug')
+                success = True
+                return text
+        except Exception as e:
+            error_msg = f"Antiword extraction failed: {str(e)}"
+            error_messages.append(error_msg)
+            safe_log(error_msg, level='warning')
+    
+    # Method 4: Try subprocess with catdoc (another Linux/Unix option)
+    if not success and platform.system() != 'Windows':
+        try:
+            result = subprocess.run(['catdoc', file_path], capture_output=True, text=True, check=True)
+            text = result.stdout
+            if text and len(text.strip()) > 100:
+                safe_log(f"Successfully extracted {len(text)} characters from DOC using catdoc", level='debug')
+                success = True
+                return text
+        except Exception as e:
+            error_msg = f"Catdoc extraction failed: {str(e)}"
+            error_messages.append(error_msg)
+            safe_log(error_msg, level='warning')
+    
+    # Method 5: Windows-only - try to convert to docx using MS Word automation
+    if not success and platform.system() == 'Windows':
+        try:
+            # Try to use Microsoft Word automation on Windows
+            import win32com.client
+            import os
+            
+            # Create a temp docx file path
+            temp_dir = tempfile.mkdtemp()
+            temp_docx = os.path.join(temp_dir, 'temp.docx')
+            
+            # Initialize MS Word
+            word = win32com.client.Dispatch('Word.Application')
+            doc = word.Documents.Open(file_path)
+            doc.SaveAs(temp_docx, FileFormat=16)  # 16 = .docx format
+            doc.Close()
+            word.Quit()
+            
+            # Extract text from the docx file
+            text = extract_text_from_docx(temp_docx)
+            
+            # Clean up
+            shutil.rmtree(temp_dir)
+            
+            if text and len(text.strip()) > 100:
+                safe_log(f"Successfully extracted {len(text)} characters from DOC using Word automation", level='debug')
+                success = True
+                return text
+        except Exception as e:
+            error_msg = f"Word automation failed: {str(e)}"
+            error_messages.append(error_msg)
+            safe_log(error_msg, level='warning')
+    
+    # Method 6: Final fallback - try to get any text content using basic file reading
+    if not success:
+        try:
+            # Basic raw file reading with encoding fallbacks
+            encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+            for encoding in encodings:
+                try:
+                    with open(file_path, 'r', encoding=encoding) as f:
+                        raw_text = f.read()
+                        # Cleanup raw text to extract only printable characters
+                        import string
+                        printable = set(string.printable)
+                        cleaned_text = ''.join(filter(lambda x: x in printable, raw_text))
+                        if len(cleaned_text.strip()) > 200:  # Only use if sufficient content
+                            safe_log(f"Extracted {len(cleaned_text)} characters using basic file reading with {encoding}", level='debug')
+                            return cleaned_text
+                except UnicodeDecodeError:
+                    continue
+        except Exception as e:
+            error_msg = f"Basic file reading failed: {str(e)}"
+            error_messages.append(error_msg)
+            safe_log(error_msg, level='warning')
+    
+    # If we made it here, all methods failed
+    if not success:
+        all_errors = '\n'.join(error_messages)
+        safe_log(f"All DOC extraction methods failed\n", level='error')
+        safe_log("To enable .doc file processing on Linux systems, install: 'sudo apt-get install antiword' or 'sudo apt-get install catdoc'", level='warning')
+        safe_log("On Windows systems without Microsoft Office, convert the file to .docx or PDF format first", level='warning')
+        
+        # Return empty string to indicate failure
+        return ""
+
+def fallback_extract_field(patterns, text, clean_fn=None):
+    """Extract field using regex patterns with fallback options"""
+    # Try each pattern in order
+    for pattern in patterns:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        if matches:
+            # Handle tuple results from capture groups in regex
+            if isinstance(matches[0], tuple):
+                # For email patterns that detect username and domain separately
+                if '@' not in matches[0][0] and len(matches[0]) > 1:
+                    # Combine parts to form a complete email
+                    value = matches[0][0] + '@' + matches[0][1]
+                else:
+                    value = matches[0][0]  # Use first capture group
+            else:
+                value = matches[0]
+                
+            # For email addresses that might be incomplete
+            if 'email' in pattern.lower() or '@' in pattern:
+                # Try to find if this is part of a larger email (common in PDFs where text gets split)
+                if '@' not in value and len(value) >= 3:
+                    # Look for domain part following this username
+                    domain_match = re.search(r'(?:@|\sat\s)[ \t\r\n]*([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', 
+                                           text[text.find(value)+len(value):text.find(value)+len(value)+100], 
+                                           re.IGNORECASE)
+                    if domain_match:
+                        value = value + '@' + domain_match.group(1)
+                
+                # If we found just the part after @, try to find username before it
+                if value.startswith('@'):
+                    username_match = re.search(r'([a-zA-Z0-9._%+-]+)[ \t\r\n]*$', 
+                                             text[max(0, text.find(value)-100):text.find(value)], 
+                                             re.IGNORECASE)
+                    if username_match:
+                        value = username_match.group(1) + value
+            
+            # Apply cleaning function if provided
+            if clean_fn:
+                value = clean_fn(value)
+                
+            return value
+    
+    # Special handling for username/email extraction when normal patterns fail
+    if any(p for p in patterns if '@' in p or 'email' in str(p).lower()):
+        # Search for potential email usernames followed by domains
+        email_parts = re.findall(r'([a-zA-Z0-9._%+-]{3,})[ \t\r\n]*(?:@|\sat\s)[ \t\r\n]*([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', 
+                                text, re.IGNORECASE)
+        if email_parts:
+            email = email_parts[0][0] + '@' + email_parts[0][1]
+            if clean_fn:
+                email = clean_fn(email)
+            return email
+            
+    return "Not provided"
+
+def extract_metadata_from_resume(resume_data):
+    """Extract metadata from resume for search filtering"""
+    metadata = {
+        "skills": "",
+        "position_titles": [],
+        "companies": [],
+        "industries": [],
+        "years_experience": 0
+    }
+    if not resume_data:
+        return metadata
+    
+    # Extract position titles and companies from the flat structure
+    if "positions" in resume_data and isinstance(resume_data["positions"], list):
+        metadata["position_titles"] = resume_data["positions"]
+    
+    if "companies" in resume_data and isinstance(resume_data["companies"], list):
+        metadata["companies"] = resume_data["companies"]
+    
+    # Get industries
+    if "industries" in resume_data and isinstance(resume_data["industries"], list):
+        metadata["industries"] = resume_data["industries"]
+    
+    # Get years experience
+    if "total_years_experience" in resume_data:
+        exp = resume_data.get("total_years_experience", 0)
+        if isinstance(exp, (int, float)):
+            metadata["years_experience"] = exp
+        elif isinstance(exp, str):
+            try:
+                if exp != "Not provided":
+                    metadata["years_experience"] = float(exp)
+            except ValueError:
+                pass
+    
+    # Get text and skills for embeddings
+    extracted_texts = extract_relevant_text_for_embeddings(resume_data)
+    metadata["document"] = extracted_texts["document"]
+    metadata["skills"] = extracted_texts["skills"]
+    
+    return metadata
+
+def extract_relevant_text_for_embeddings(resume_data):
+    """Extract relevant text from resume data for generating embeddings"""
+    if not resume_data:
+        return {"document": "", "skills": ""}
+    
+    document_parts = []
+    
+    # Add name and contact info if available
+    if "name" in resume_data and resume_data["name"] != "Not provided":
+        document_parts.append(f"Name: {resume_data['name']}")
+    
+    # Add summary
+    if "summary" in resume_data and resume_data["summary"] != "Not provided":
+        document_parts.append(f"Summary: {resume_data['summary']}")
+    
+    # Add professional data (may be nested)
+    professional_data = resume_data.get('professional_data', {})
+    if isinstance(professional_data, dict) and professional_data:
+        # Extract from professional_data if available
+        if 'summary' in professional_data and professional_data['summary'] != "Not provided":
+            document_parts.append(f"Professional Summary: {professional_data['summary']}")
+        
+        # Add experience from professional_data
+        prof_positions = professional_data.get('positions', [])
+        prof_companies = professional_data.get('companies', [])
+        for i in range(min(len(prof_positions), len(prof_companies))):
+            document_parts.append(f"Experience: {prof_positions[i]} at {prof_companies[i]}")
+    
+    # Add work experience directly from top level if available
+    positions = resume_data.get("positions", [])
+    companies = resume_data.get("companies", [])
+    
+    # Combine positions and companies if available
+    for i in range(min(len(positions), len(companies))):
+        job_desc = f"Experience: {positions[i]} at {companies[i]}"
+        document_parts.append(job_desc)
+    
+    # Add education
+    education = resume_data.get("education", [])
+    if isinstance(education, list):
+        for edu in education:
+            if isinstance(edu, dict):
+                degree = edu.get("degree", "")
+                institution = edu.get("institution", "")
+                year = edu.get("year", "")
+                edu_desc = f"Education: {degree} from {institution} {f'({year})' if year else ''}"
+                document_parts.append(edu_desc)
+    
+    # Add projects
+    projects = resume_data.get("projects", [])
+    if isinstance(projects, list):
+        for project in projects:
+            if isinstance(project, dict):
+                name = project.get("name", "")
+                description = project.get("description", "")
+                proj_desc = f"Project: {name}: {description}"
+                document_parts.append(proj_desc)
+    
+    # Add certifications
+    certifications = resume_data.get("certifications", [])
+    if isinstance(certifications, list) and certifications:
+        cert_text = "Certifications: " + ", ".join([cert if isinstance(cert, str) else cert.get("name", "") for cert in certifications])
+        document_parts.append(cert_text)
+    
+    # Join all parts with newlines for better readability in embeddings
+    document = "\n".join([part for part in document_parts if part])
+    
+    # Extract skills
+    skills = resume_data.get("skills", [])
+    skills_text = ", ".join(skills) if isinstance(skills, list) and skills else ""
+    
+    return {
+        "document": document,
+        "skills": skills_text
+    }
+
+def extract_name_from_raw_text(raw_text):
+    """Enhanced extraction of names from raw resume text with multiple approaches"""
+    # Skip processing if the text is too short
+    if not raw_text or len(raw_text) < 20:
+        return None
+        
+    # Define invalid names - common section headers mistaken for names
+    invalid_names = ['profile summary', 'resume', 'curriculum vitae', 'cv', 'personal profile', 
+                    'professional summary', 'contact information', 'contact details', 'summary',
+                    'career objective', 'objective', 'cover letter', 'experience', 'work experience',
+                    'education', 'personal details', 'skills', 'qualifications', 'references']
+    
+    # Look for CONTACT_INFO markers we added during DOCX extraction
+    contact_info_matches = re.findall(r'CONTACT_INFO:\s*([^\n]+)', raw_text)
+    if contact_info_matches:
+        # First contact info line often contains the name
+        first_line = contact_info_matches[0].strip()
+        # Check if it looks like a name (not too long, no special chars)
+        if len(first_line) < 40 and re.match(r'^[A-Za-z\s.,]+$', first_line):
+            # Validate it's not a common section header
+            if first_line.lower() not in invalid_names:
+                return first_line
+    
+    # Strategy 1: Look for names at the beginning of the document
+    lines = raw_text.split('\n')
+    for i, line in enumerate(lines[:15]):  # Check first 15 lines
+        line = line.strip()
+        # Skip empty lines, headings like "CV" or "RESUME", and too long lines
+        if not line or len(line) > 50 or line.lower() in invalid_names:
+            continue
+        
+        # Check if line looks like a name (proper case, no numbers or special chars)
+        if re.match(r'^[A-Z][a-z]+(\s+[A-Z][a-z]+){1,3}$', line) and line.lower() not in invalid_names:
+            return line
+    
+    # Strategy 2: Look for name patterns throughout the text
+    name_patterns = [
+        # Name with label
+        r'(?:name|full name|candidate)[\s:-]*([A-Z][a-z]+(\s+[A-Z][a-z]+){1,3})',
+        # Name at beginning of line with proper case (common in resumes)
+        r'^\s*([A-Z][a-z]+(\s+[A-Z][a-z]+){1,3})\s*$',
+        # Names with middle initials
+        r'([A-Z][a-z]+\s+[A-Z][.]\s+[A-Z][a-z]+)',
+        # Any proper case sequence on its own line (likely a name)
+        r'^\s*([A-Z][a-zA-Z]+(\s+[A-Z][a-zA-Z]+){1,3})\s*$',
+        # Simple proper-case word pairs or triplets (looser pattern as last resort)
+        r'\b([A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}(\s+[A-Z][a-z]{2,})?)\b'
+    ]
+    
+    for pattern in name_patterns:
+        matches = re.findall(pattern, raw_text, re.MULTILINE)
+        if matches:
+            candidate_name = matches[0][0].strip() if isinstance(matches[0], tuple) else matches[0].strip()
+            # Validate the candidate name
+            if candidate_name.lower() not in invalid_names and len(candidate_name) < 40:
+                # Additional check: Names typically don't contain certain words
+                if not any(word in candidate_name.lower() for word in ['profile', 'resume', 'summary', 'experience', 'education',
+                                                                       'objective', 'contact', 'skills', 'qualification']):
+                    
+                    # Validate it looks like a name with first and last name structure
+                    name_parts = candidate_name.split()
+                    if 2 <= len(name_parts) <= 4:  # Names typically have 2-4 parts
+                        # Check that each part starts with uppercase and rest is lowercase (proper case)
+                        if all(part[0].isupper() and part[1:].islower() for part in name_parts if len(part) > 1):
+                            # Check name doesn't have non-name words
+                            non_name_words = ['ltd', 'limited', 'inc', 'corporation', 'company', 'technologies', 'software', 'solutions']
+                            if not any(word.lower() in non_name_words for word in name_parts):
+                                return candidate_name
+    
+    # As a last resort, try to find email and infer name from email username
+    email_match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', raw_text)
+    if email_match:
+        email = email_match.group(0)
+        username = email.split('@')[0]
+        # Try to infer a name from username (if it looks like a name pattern)
+        if re.match(r'[a-z]+\.[a-z]+', username):
+            # Pattern like "firstname.lastname"
+            name_parts = username.split('.')
+            inferred_name = ' '.join(part.capitalize() for part in name_parts)
+            return inferred_name
+        
+    return None
+
+def extract_data_from_raw_text(raw_text, file_path=None):
+    """Fallback method to extract structured data from raw text
+    Used when the LLM JSON parsing fails, especially for DOCX files"""
+    try:
+        safe_log(f"Using fallback text extraction for {file_path if file_path else 'document'}", level='info')
+        
+        # Clean and preprocess the text
+        # Remove excessive whitespace, normalize line breaks
+        clean_text = re.sub(r'\s+', ' ', raw_text)
+        clean_text = re.sub(r'\n\s*\n', '\n\n', raw_text)  # Preserve paragraph breaks
+        
+        # Clean text without emoji and special Unicode characters
+        safe_text = ''.join(c for c in clean_text[:200] if ord(c) < 127)
+        safe_log(f"Fallback extraction - first 200 chars: {safe_text}...", level='debug')
+        
+        # Initialize all variables we'll need
+        name = "Unknown"
+        email = "Not provided"
+        phone_number = "Not provided"
+        address = "Not provided"
+        linkedin_url = extract_linkedin_url(raw_text)  # Extract LinkedIn URL using dedicated function
+        education = []
+        
+        # Extract name with our improved method
+        extracted_name = extract_name_from_raw_text(raw_text)
+        if extracted_name:
+            name = extracted_name
+        else:
+            # Try filename as fallback
+            name = extract_name_from_filename(file_path)
+            
+            # If that fails too, use pattern matching
+            if not name or name == "Not provided":
+                name = fallback_extract_field(NAME_PATTERNS, clean_text)
+        
+        # Common job titles to exclude from name
+        job_titles = ["consultant", "developer", "engineer", "analyst", "manager", "director", "lead"]
+        
+        # If name contains multiple lines or job titles, clean it up
+        if name:
+            # Remove any job titles that might be part of the name
+            name_parts = name.split()
+            name = ' '.join([part for part in name_parts 
+                            if part.lower() not in job_titles])
+            
+            # Final verification - name should have 2-3 words, each starting with capital letter
+            name_check = all(word[0].isupper() for word in name.split() if word)
+            if not name_check or len(name.split()) > 4 or len(name.split()) < 2:
+                # Try one more time with strict pattern matching
+                name_match = re.search(r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})', clean_text)
+                if name_match:
+                    name = name_match.group(1)
+        
+        # Extract phone numbers with more comprehensive pattern matching
+        phone_patterns = [
+            # International format with + sign
+            r'\b\+\d{1,3}[-\s]?\d{3,4}[-\s]?\d{3,4}[-\s]?\d{3,4}\b',
+            # International format with country code in label
+            r'(?:phone|mobile|cell|telephone|tel|contact)\s*[:-]\s*(?:\+\d{1,3}[-\s]?)?\d{3,4}[-\s]?\d{3,4}[-\s]?\d{3,4}',
+            # Standard US formats
+            r'\b(?:\+?1[-\s]?)?\(?\d{3}\)?[-\s]?\d{3}[-\s]?\d{4}\b',
+            # E.164 international format
+            r'\b\+\d{1,3}\s?\d{6,14}\b',
+            # Common formats with dashes or dots
+            r'\b\d{3}[-\.]\d{3}[-\.]\d{4}\b',
+            # With country code in parens
+            r'\b\(\+?\d{1,3}\)[-\s]?\d{6,14}\b',
+            # Phone with label (case insensitive)
+            r'(?i)(?:phone|mobile|cell|telephone|tel|contact|phone number|mobile number)\s*[:-]\s*((?:\+?\d{1,3}[-\(\)\s]?)?\d{3,4}[-\s\.]?\d{3,4}[-\s\.]?\d{3,4})',
+        ]
+        
+        # Extract all possible phone matches
+        all_phone_matches = []
+        for pattern in phone_patterns:
+            matches = re.findall(pattern, raw_text, re.IGNORECASE)
+            for match in matches:
+                if isinstance(match, tuple):
+                    # Join the parts if the pattern returned username and domain separately
+                    combined = match[0] + match[1]
+                    all_phone_matches.append(combined)
+                else:
+                    all_phone_matches.append(match)
+        
+        # Clean and filter phone matches
+        valid_phones = []
+        for phone_match in all_phone_matches:
+            cleaned = clean_phone(phone_match)
+            if cleaned != "Not provided":
+                valid_phones.append(cleaned)
+        
+        # Select the best phone (prioritize ones with country code)
+        phone_number = "Not provided"
+        if valid_phones:
+            for phone in valid_phones:
+                if phone.startswith('+'):
+                    phone_number = phone
+                    break
+            if phone_number == "Not provided":
+                phone_number = valid_phones[0]
+        
+        # Use the standardized EMAIL_PATTERNS from regex_patterns.py
+        # This includes patterns for emails with spaces and special formatting
+        email_patterns = EMAIL_PATTERNS
+        
+        # Add additional email extraction patterns specific to raw text parsing
+        additional_email_patterns = [
+            # Email with label
+            r'(?:Email|E-?mail|Mail)\s*[:-]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
+            # Email in HTML format
+            r'mailto:([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
+            # Email with surrounding characters
+            r'[^a-zA-Z0-9]([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})[^a-zA-Z0-9]'
+        ]
+        
+        # Combine all patterns
+        email_patterns = email_patterns + additional_email_patterns
+        
+        # Extract all possible email matches
+        all_email_matches = []
+        for pattern in email_patterns:
+            try:
+                matches = re.findall(pattern, raw_text, re.IGNORECASE)
+                for match in matches:
+                    if isinstance(match, tuple):
+                        # Join the parts if the pattern returned username and domain separately
+                        # Special case for patterns like ([A-Za-z0-9._%+-]+\s+\d+)@([A-Za-z0-9.-]+\.[A-Za-z]{2,})
+                        if len(match) == 2 and '@' not in match[0] and '@' not in match[1]:
+                            combined = match[0] + '@' + match[1]
+                            all_email_matches.append(combined)
+                            safe_log(f"Combined email parts: {match[0]} @ {match[1]} = {combined}", level='debug')
+                        else:
+                            # Handle other tuple patterns that might include entire email
+                            for part in match:
+                                if '@' in part:
+                                    all_email_matches.append(part)
+                                    safe_log(f"Found email in tuple part: {part}", level='debug')
+                    else:
+                        # Simple string match
+                        if '@' in match:
+                            all_email_matches.append(match)
+                            safe_log(f"Found direct email match: {match}", level='debug')
+            except Exception as e:
+                safe_log(f"Error with email pattern {pattern}: {str(e)}", level='warning')
+                continue
+        
+        # Special case for emails with spaces in username (like "koustavghosh 200@gmail.com")
+        space_in_email_pattern = r'([A-Za-z0-9._%+-]+)\s+(\d+)@([A-Za-z0-9.-]+\.[A-Za-z]{2,})'
+        space_matches = re.findall(space_in_email_pattern, raw_text, re.IGNORECASE)
+        for match in space_matches:
+            if len(match) == 3:  # username, number, domain
+                full_email = f"{match[0]}{match[1]}@{match[2]}"
+                all_email_matches.append(full_email)
+                safe_log(f"Found email with space: {match[0]} {match[1]}@{match[2]} = {full_email}", level='debug')
+        
+        # Clean and filter email matches
+        valid_emails = []
+        for email_match in all_email_matches:
+            cleaned = clean_email(email_match)
+            if cleaned != "Not provided" and '@' in cleaned and '.' in cleaned.split('@')[1]:
+                valid_emails.append(cleaned)
+                safe_log(f"Valid email after cleaning: {cleaned}", level='debug')
+        
+        # Select the best email (prioritize ones with name parts)
+        email = "Not provided"
+        if valid_emails:
+            if extracted_name:
+                # Try to find an email containing parts of the name (common in professional emails)
+                name_parts = extracted_name.lower().split()
+                for e in valid_emails:
+                    username = e.split('@')[0].lower()
+                    for part in name_parts:
+                        if len(part) > 2 and part.lower() in username:  # Match substantial name parts
+                            email = e
+                            safe_log(f"Found name-matching email: {email}", level='debug')
+                            break
+                    if email != "Not provided":
+                        break
+            
+            # If no name match, use the first valid email
+            if email == "Not provided":
+                email = valid_emails[0]
+        
+        # Fix partial/truncated emails using a generalized approach
+        if email != "Not provided" and "@" in email:
+            username = email.split('@')[0]
+            domain = email.split('@')[1]
+            
+            # Check if the username appears to be truncated or incomplete
+            suspect_truncation = False
+            
+            # Criteria for suspecting truncation:
+            # 1. Very short username (<=3 chars)
+            # 2. Username is just numbers
+            # 3. Username ends with numeric characters that appear isolated
+            if len(username) <= 3 or username.isdigit() or re.match(r'.*\d+$', username):
+                suspect_truncation = True
+            
+            if suspect_truncation:
+                # Flag to track if we found a better email
+                found_better_email = False
+                
+        # Create result dictionary with extracted data
+        # Initialize list to store education entries
+        education = []
+        
+        # List of common education keywords for validation
+        edu_keywords = ['degree', 'university', 'college', 'institute', 'school', 'bachelor', 'master', 'phd', 'diploma', 'certification', 'b.tech', 'm.tech', 'engineering', 'graduate', 'class', 'cgpa', 'gpa', 'graduated']
+        
+        # Extract education information
+        edu_entries = extract_education(raw_text)
+        for entry in edu_entries:
+            # Handle both string and dictionary entries
+            if isinstance(entry, str):
+                if any(keyword.lower() in entry.lower() for keyword in edu_keywords):
+                    education.append(entry)
+            elif isinstance(entry, dict):
+                # For dictionary entries, check in the values
+                entry_text = ' '.join(str(value) for value in entry.values() if value)
+                if any(keyword.lower() in entry_text.lower() for keyword in edu_keywords):
+                    education.append(entry)
+        
+        # Extract companies and positions directly
+        companies = extract_companies_from_text(raw_text)
+        positions = extract_positions(raw_text)
+        
+        result = {
+            'name': name,
+            'email': email,
+            'phone_number': phone_number,
+            'address': address,
+            'linkedin_url': linkedin_url,
+            'summary': extract_summary(raw_text),
+            'skills': extract_skills(raw_text),
+            'total_years_experience': extract_experience_years(raw_text),
+            'positions': positions,
+            'companies': companies,
+            'education': education,
+            'industries': [],
+            'projects': [],
+            'certifications': [],
+            'achievements': [],
+            'last_updated': datetime.now().isoformat()
+        }
+        
+        # Apply the validation function to ensure mandatory fields
+        summary, skills, positions, industries, projects = validate_mandatory_fields(
+            result, result.get('name', "Candidate")
+        )
+        
+        # Update with validated fields
+        result['summary'] = summary
+        result['skills'] = skills
+        result['positions'] = positions
+        result['industries'] = industries
+        result['projects'] = projects
+        
+        # Add nested structure for professional data
+        result['professional_data'] = {
+            'summary': result['summary'],
+            'total_years_experience': result['total_years_experience'],
+            'positions': result['positions'],
+            'companies': result['companies'],
+            'skills': result['skills']
+        }
+        
+        return result
+        
+    except Exception as e:
+        safe_log(f"Error in direct text extraction: {str(e)}", level='error')
+        return None
+
+def is_likely_job_description(text):
+    """Generic approach to determine if text is a job description rather than an address.
+    
+    Args:
+        text (str): The text to analyze
+        
+    Returns:
+        bool: True if it looks like a job description, False otherwise
+    """
+    if not text:
+        return False
+        
+    # 1. Structural Analysis - Job descriptions have specific sentence structures
+    
+    # Statistical features
+    word_count = len(text.split())
+    sentence_count = len(re.split(r'[.!?]\s', text))
+    avg_words_per_sentence = word_count / max(1, sentence_count)
+    
+    # Typical sentences in job descriptions are longer
+    if avg_words_per_sentence > 12 and word_count > 15 and not re.search(r'\b\d{5,6}\b', text):  # No PIN code
+        return True
+    
+    # 2. Content Analysis - Check for job/project related language patterns
+    
+    # More comprehensive job-related semantic clusters (grouped by meaning)
+    business_terms = r'\b(?:business|company|customer|client|industry|market|revenue|growth|profit|service)s?\b'
+    technology_terms = r'\b(?:ETL|warehouse|database|system|application|software|API|integration|solution|framework|architecture)s?\b'
+    project_terms = r'\b(?:project|implement|develop|design|maintain|support|create|build|deliver|deployment)\b'
+    responsibility_terms = r'\b(?:responsible|managed|led|coordinated|facilitated|directed|handled|analyzed|improved)\b'
+    product_terms = r'\b(?:product|feature|module|component|functionality|interface|platform|tool)s?\b'
+    
+    # Sentence structure patterns common in job descriptions
+    job_syntactic_patterns = [
+        r'\b(?:was|is|am|were|are)\s+(?:responsible|tasked|involved)\s+(?:for|with|in)\b', # "was responsible for"
+        r'\b(?:provided|delivered|supported|managed|led)\s+(?:the|a|an)?\s+(?:[a-z]+\s+){0,3}(?:team|project|solution|system)\b',
+        r'\b(?:worked|collaborated)\s+(?:on|with|in)\b',
+        r'\bpart\s+of\s+(?:the|a|an)\s+team\b',
+        r'\bin\s+this\s+(?:project|role|position)\b'
+    ]
+    
+    # Check for the semantic clusters
+    semantic_matches = [
+        re.search(business_terms, text, re.IGNORECASE) is not None,
+        re.search(technology_terms, text, re.IGNORECASE) is not None,
+        re.search(project_terms, text, re.IGNORECASE) is not None,
+        re.search(responsibility_terms, text, re.IGNORECASE) is not None,
+        re.search(product_terms, text, re.IGNORECASE) is not None
+    ]
+    
+    # Check for job-specific syntactic patterns
+    syntactic_matches = any(re.search(pattern, text, re.IGNORECASE) for pattern in job_syntactic_patterns)
+    
+    # If we have matches from multiple semantic categories or syntactic patterns, it's likely a job description
+    if sum(semantic_matches) >= 2 or syntactic_matches:  # At least 2 different types of job terms
+        return True
+                
+    # Check for bullet points that typically indicate job responsibilities
+    if re.search(r'^[\u2022\*\-\+]\s', text.strip()):
+        return True
+        
+    # Check for sentences that begin with action verbs common in job descriptions
+    action_verbs = [
+        r'(?:Worked|Developed|Implemented|Designed|Created|Built|Maintained|Supported|Managed|Led|Coordinated|Analyzed)'
+    ]
+    
+    for pattern in action_verbs:
+        if re.search(pattern, text, re.IGNORECASE):
+            return True
+    
+    # Negative indicators - text is likely NOT a job description if it has address components
+    address_indicators = [
+        r'P\.O\.',
+        r'\bFlat\b',
+        r'\bSector\b',
+        r'\bDistrict\b',
+        r'\bNagar\b',
+        r'-\d{6}',  # PIN code
+        r'\b\d{6}\b'  # PIN code
+    ]
+    
+    # If the text has clear address indicators, it's not a job description
+    for pattern in address_indicators:
+        if re.search(pattern, text):
+            return False
+    
+    return False
+
+def extract_linkedin_url(raw_text):
+    """Extract LinkedIn URL from raw text using regex pattern matching"""
+    if not raw_text:
+        return "Not provided"
+    
+    # LinkedIn URL patterns
+    linkedin_patterns = [
+        # Standard LinkedIn URL with http/https
+        r'https?://(?:www\.)?linkedin\.com/in/[A-Za-z0-9_.-]+/?',
+        
+        # LinkedIn URL without http/https
+        r'linkedin\.com/in/[A-Za-z0-9_.-]+/?',
+        
+        # LinkedIn with context labels
+        r'(?:LinkedIn|Linked\s?In)\s*[:-]\s*(https?://(?:www\.)?linkedin\.com/in/[A-Za-z0-9_.-]+/?)',
+        
+        # LinkedIn URL with the word Profile
+        r'(?:LinkedIn|Linked\s?In)\s*(?:Profile|URL|Link)?\s*[:-]\s*(https?://(?:www\.)?linkedin\.com/in/[A-Za-z0-9_.-]+/?)',
+        
+        # LinkedIn URL in parentheses or brackets
+        r'[\(\[\{](https?://(?:www\.)?linkedin\.com/in/[A-Za-z0-9_.-]+/?)[\)\]\}]',
+        
+        # More flexible pattern for partial matches
+        r'(?:in|linkedin)/([A-Za-z0-9_.-]{5,30})'
+    ]
+    
+    for pattern in linkedin_patterns:
+        matches = re.findall(pattern, raw_text, re.IGNORECASE)
+        if matches:
+            # Take the first match but ensure it's properly formatted
+            linkedin_url = matches[0]
+            if isinstance(linkedin_url, tuple):
+                linkedin_url = linkedin_url[0]
+            
+            # Clean and normalize the URL
+            if linkedin_url:
+                # Add https:// prefix if missing
+                if not linkedin_url.startswith(('http://', 'https://')):
+                    if linkedin_url.startswith('www.'):
+                        linkedin_url = 'https://' + linkedin_url
+                    elif 'linkedin.com' in linkedin_url:
+                        linkedin_url = 'https://www.' + linkedin_url
+                    elif linkedin_url.startswith(('in/', '/in/')):
+                        linkedin_url = 'https://www.linkedin.com' + ('/in/' + linkedin_url.split('in/')[1] if 'in/' in linkedin_url else linkedin_url)
+                    else:
+                        linkedin_url = 'https://www.linkedin.com/in/' + linkedin_url
+                
+                # Ensure the URL ends with trailing slash for consistency
+                if not linkedin_url.endswith('/'):
+                    linkedin_url += '/'
+                    
+                return linkedin_url
+    
+    return "Not provided"
+
+def extract_address_from_raw_text(raw_text):
+    """Enhanced function to extract address from raw text while avoiding phone numbers, emails, and job descriptions"""
+    if not raw_text:
+        return "Not provided"
+    
+    # Preprocessing to clean the text
+    raw_text = raw_text.replace('\r', '\n')
+    
+    # Log the process for debugging
+    safe_log(f"Extracting address from text of length: {len(raw_text)}", level='debug')
+
+    address_indicators = [
+        'street', 'road', 'avenue', 'lane', 'district', 'city', 'state', 'pin', 'zip',
+        'apartment', 'flat', 'floor', 'block', 'sector', 'area', 'town', 'village',
+        'nagar', 'colony', 'marg', 'path', 'cross', 'layout', 'enclave', 'puram', 'palli', 'chowk',
+        'p.o', 'post office', 'tehsil', 'taluk', 'mandal', 'zilla', 'country', 'house no', 'h.no'
+    ]
+    
+    # Pattern to detect and exclude phone numbers so they don't get mistaken for addresses
+    phone_pattern = r'\+?\d{1,4}[-.]\s?\(?\d{1,}\)?[-.]\s?\d{1,}[-.]\s?\d{1,}'
+    email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+    
+    # First look for contact info section - common in resumes
+    contact_section_pattern = r'(?:contact|personal|details|information)\s*(?:information|details)?\s*:?\s*(?:\n|\r|\s)*([^\n]*(?:\n[^\n]*){0,5})'
+    contact_matches = re.findall(contact_section_pattern, raw_text[:3000], re.IGNORECASE)
+    
+    if contact_matches:
+        contact_section = contact_matches[0]
+        # Process each line in the contact section
+        for line in contact_section.split('\n'):
+            line = line.strip()
+            # Skip short lines, emails, phone numbers (even partial if it's mostly digits), or lines that are just a name and country
+            if len(line) < 10 or '@' in line or re.fullmatch(r'\s*\+?[\d\s\-\(\)]+\s*', line): # Mostly digits/phone chars
+                continue
+            # Skip if it looks like just a name and optionally a country or contact details
+            # Example: "Pooja Raghuwanshi India email@example.com +919xxxxxxxxx"
+            # Example: "kirti - naik374062122"
+            temp_line_no_email_phone = re.sub(email_pattern, '', line)
+            temp_line_no_email_phone = re.sub(phone_pattern, '', temp_line_no_email_phone).strip()
+            words_remaining = temp_line_no_email_phone.split()
+            
+            is_name_id_pattern = re.fullmatch(r'[A-Za-z\s\-]+?\s*-\s*[A-Za-z0-9]+', temp_line_no_email_phone)
+
+            if (len(words_remaining) <= 3 and not any(kw in temp_line_no_email_phone.lower() for kw in ['street', 'road', 'lane', 'nagar', 'colony', 'p.o', 'house', 'apt', 'flat', 'sector', 'block', 'door no', 'gate no'])) or is_name_id_pattern:
+                # Check if the remaining part has any digits (like house number or pin) or specific address keywords
+                has_digits = re.search(r'\d{2,}', temp_line_no_email_phone)
+                has_strong_address_kw = any(kw in temp_line_no_email_phone.lower() for kw in address_indicators if kw not in ['city', 'state', 'country', 'pin', 'zip'])
+                
+                if not (has_digits and has_strong_address_kw):
+                    if not (has_strong_address_kw and len(words_remaining) > 1): # Allow if it has strong keywords and more than one word left
+                        if not (re.search(r'(?:pin|zip)\s*[:-]?\s*\d{5,}', temp_line_no_email_phone.lower()) and len(words_remaining) > 2): # Allow Pincode/Zip with other info
+                            safe_log(f"Skipping line as it appears to be name/contact/ID only: {line}", level='debug')
+                            continue
+            # Check if line contains address indicators
+            if re.search(r'(?:street|road|avenue|lane|district|city|state|pin|zip|apartment|flat|floor|block|sector|area|town|village|p\.?o\.?\b)', line, re.IGNORECASE):
+                return line
+    
+    # Check for P.O. pattern (commonly missed)
+    po_pattern = r'(P\.?O\.?[^,\n.]{3,}(?:,|\.|\n|$)[^,\n.]{3,}(?:,|\.|\n|$)[^,\n.]{0,}\s*[-]?\s*\d{5,6})'
+    po_matches = re.findall(po_pattern, raw_text[:3000], re.IGNORECASE)
+    if po_matches:
+        return re.sub(r'\s+', ' ', po_matches[0].strip())
+    
+    # Enhanced explicit address patterns
+    explicit_address_patterns = [
+        # Address with specific label - highest confidence
+        r'(?:address|permanent address|current address|residence|location|addr)\s*[:\-]\s*([^\n]+(?:\n[^\n]+){0,2})',
+        
+        # Standard Indian address format with PIN code
+        r'([A-Za-z0-9\s,.#\-()]{10,}[\s\-]*\d{6})(?![0-9])',
+        
+        # Address with city, state format
+        r'([A-Za-z0-9\s,.#\-()]{10,}\s+(?:District|City|State|Country|India|Pin)[\s:]*[A-Za-z0-9\s,.#\-]{3,})',
+        
+        # Common address formats with city and state
+        r'([A-Za-z0-9\s,.#\-()]{5,},[A-Za-z\s]+,[A-Za-z\s]+\s*[-]?\s*\d{5,6})',
+        
+        # Address after symbols like 📍 or 🏠 (common in modern resumes)
+        r'[📍🏠]\s*([A-Za-z0-9\s,.#\-()]{10,}\s*\d{5,6})',
+        
+        # Location-based pattern
+        r'Location\s*[:\-]\s*([^\n]+)',
+        
+        # Residence pattern
+        r'Residing at\s*[:\-]?\s*([^\n]+)',
+    ]
+    
+    # Apply patterns to a reasonable chunk of the resume (where contact info usually appears)
+    # Scan more lines for address as it can appear later in some formats
+    first_100_lines = "\n".join(raw_text.split('\n')[:100])
+    
+    # Find all phone numbers and emails in the text so we can exclude them
+    phone_matches = set(re.findall(phone_pattern, first_100_lines))
+    email_matches = set(re.findall(email_pattern, first_100_lines))
+    
+    # Log the detection process
+    safe_log(f"Searching for address in first 100 lines with {len(explicit_address_patterns)} patterns", level='debug')
+    
+    # These words indicate the text is likely NOT an address but a job description
+    job_desc_indicators = [
+        'experience', 'project', 'responsible', 'client', 'customer', 'service', 'business', 'company',
+        'develop', 'implement', 'manage', 'team', 'lead', 'solution', 'technologies', 'limited', 'pvt',
+        'ltd', 'inc', 'corp', 'llc', 'associates', 'group', 'services', 'consulting', 'university',
+        'institute', 'college', 'engineer', 'developer', 'manager', 'analyst', 'specialist', 'executive'
+    ]
+    
+    # Try explicit patterns first
+    for i, pattern in enumerate(explicit_address_patterns):
+        matches = re.findall(pattern, first_100_lines, re.IGNORECASE)
+        if matches:
+            safe_log(f"Found {len(matches)} potential addresses with pattern {i+1}", level='debug')
+            for match in sorted(matches, key=len, reverse=True):  # Start with longest matches
+                clean_address = match.strip()
+                
+                # Skip if it contains a phone number
+                if any(phone in clean_address for phone in phone_matches):
+                    safe_log(f"Skipping address with phone number: {clean_address}", level='debug')
+                    continue
+                    
+                # Skip if it contains an email
+                if any(email in clean_address for email in email_matches):
+                    safe_log(f"Skipping address with email: {clean_address}", level='debug')
+                    continue
+                    
+                # Skip if too short (probably not a real address)
+                if len(clean_address) < 10:
+                    safe_log(f"Skipping address that is too short: {clean_address}", level='debug')
+                    continue
+                
+                # IMPORTANT: Skip if it contains too many job description indicators
+                job_indicator_count = sum(1 for indicator in job_desc_indicators if indicator in clean_address.lower())
+                # IMPORTANT: Skip if it contains too many job description/company indicators or is excessively long
+                # Also, if it has company keywords and lacks common address terms, it's suspicious.
+                company_keywords = ['ltd', 'pvt', 'solutions', 'technologies', 'inc', 'llc', 'corp', 'limited', 'group', 'services']
+                has_company_kw = any(ckw in clean_address.lower() for ckw in company_keywords)
+                has_address_kw = any(akw in clean_address.lower() for akw in ['street', 'road', 'lane', 'nagar', 'colony', 'p.o', 'house', 'apt', 'flat', 'sector', 'block', 'city', 'state', 'pin', 'zip', 'district'])
+
+                if job_indicator_count > 1 or len(clean_address) > 150 or (has_company_kw and not has_address_kw and job_indicator_count > 0):
+                    safe_log(f"Skipping likely job description with {job_indicator_count} indicators: {clean_address[:50]}...", level='debug')
+                    continue
+                    
+                # Clean up formatting - replace multiple spaces and newlines with single space
+                clean_address = re.sub(r'\s+', ' ', clean_address)
+                
+                # Return if we have a valid address
+                safe_log(f"Found valid address: {clean_address}", level='info')
+                return clean_address
+    
+    # Split into paragraphs and try to find address-like paragraphs
+    paragraphs = re.split(r'\n\s*\n', first_100_lines)
+    for para in paragraphs:
+        # If paragraph has address indicators and is not too long
+        para = para.strip()
+        if any(indicator in para.lower() for indicator in address_indicators) and 10 < len(para) < 200 and not re.fullmatch(r'\s*[A-Za-z]+\s+[A-Za-z]+\s*(?:[A-Za-z]+\s*)?(?:India|USA|UK|Canada)?\s*', para, re.IGNORECASE): # Avoid Name Country type lines
+            # Skip if it contains a phone number
+            if any(phone in para for phone in phone_matches):
+                safe_log(f"Skipping paragraph with phone number: {para[:50]}...", level='debug')
+                continue
+                
+            # Skip if it contains an email
+            if any(email in para for email in email_matches):
+                safe_log(f"Skipping paragraph with email: {para[:50]}...", level='debug')
+                continue
+                
+            # Skip if it looks like a job description
+            job_indicator_count = sum(1 for indicator in job_desc_indicators if indicator in para.lower())
+            if job_indicator_count > 2:
+                safe_log(f"Skipping paragraph with {job_indicator_count} job indicators: {para[:50]}...", level='debug')
+                continue
+                
+            # Clean up formatting
+            clean_para = re.sub(r'\s+', ' ', para)
+            safe_log(f"Found address from paragraph: {clean_para}", level='info')
+            return clean_para
+    
+    # Look through lines one by one
+    lines = first_100_lines.split('\n')
+    for line in lines:
+        line = line.strip()
+        # Check for address-like lines with better filtering
+        if 10 < len(line) < 100 and re.search(r'\d', line) and not re.search(r'@', line):
+            # Check for common address components
+            if re.search(r'(?:street|road|ave|lane|dist|city|state|pin|zip|apt|flat|floor|block|sector|area|town|village|p\.o|postal)', line.lower()):
+                # Skip if it contains too many job indicators
+                job_indicator_count = sum(1 for indicator in job_desc_indicators if indicator in line.lower())
+                company_keywords_in_line = ['ltd', 'pvt', 'solutions', 'technologies', 'inc', 'llc', 'corp', 'limited', 'group', 'services']
+                has_comp_kw_line = any(ckw in line.lower() for ckw in company_keywords_in_line)
+                if job_indicator_count > 1 or (has_comp_kw_line and job_indicator_count > 0):
+                    continue
+                return line
+    
+    # If nothing found, return default
+    return "Not provided"
+
+def extract_certifications_from_raw_text(raw_text):
+    """Extract certification information from raw resume text
+    
+    This function uses regex patterns to identify common certification formats in resume text.
+    It looks for certification sections, lists, and common certification names.
+    
+    Args:
+        raw_text (str): The raw text content of a resume
+        
+    Returns:
+        list: A list of certification strings
+    """
+    if not raw_text:
+        return []
+        
+    # Standardize line breaks
+    raw_text = raw_text.replace('\r', '\n')
+    
+    # Look for a certification section first
+    cert_section_patterns = [
+        r'(?:CERTIFICATIONS?|LICENSES?|ACCREDITATIONS?)\s*(?:\:|\n)\s*([^\n].+(?:\n[^\n]+){0,15})',
+        r'(?:CERTIFICATIONS?|LICENSES?|ACCREDITATIONS?)\s*([^\n].+(?:\n[^\n]+){0,15})',
+        r'(?:PROFESSIONAL|TECHNICAL)\s+(?:CERTIFICATIONS?|LICENSES?|ACCREDITATIONS?)\s*(?:\:|\n)\s*([^\n].+(?:\n[^\n]+){0,15})'
+    ]
+    
+    # Common certification names and abbreviations to look for
+    common_certs = [
+        'AWS Certified', 'Azure', 'MCSA', 'MCSE', 'MCTS', 'MCITP', 'MCP', 'CCNA', 'CCNP', 'CCIE',
+        'CompTIA', r'A+', r'Network+', r'Security+', 'PMP', 'ITIL', 'Six Sigma', 'CISSP', 'CISA',
+        'CISM', 'CEH', 'OSCP', 'OSCE', 'OCSP', 'RHCE', 'RHCSA', 'Oracle', 'OCA', 'OCP', 'OCE',
+        'Salesforce', 'Google Cloud', 'GCP', 'Scrum', 'SAFe', 'CSM', 'CSPO', 'CSD', 'Professional Scrum',
+        'Microsoft Certified', 'Certified Cloud', 'Kubernetes', 'CKA', 'CKAD', 'Docker', 'Terraform',
+        'HashiCorp', 'Ansible', 'Puppet', 'Chef', 'DevOps', 'ScrumMaster', 'Product Owner',
+        'Agile Coach', 'Professional Engineer', 'PE', 'EIT', 'FE', 'CPA', 'CFA', 'Series 7',
+        'Series 63', 'FINRA', 'NASD', 'BAR', 'ACA', 'Actuary', 'CMA', 'SHRM', 'PHR', 'SPHR',
+        'CHRP', 'CAPM', 'PMI-ACP', 'PRINCE2', 'CPCU', 'CLU', 'ChFC', 'RFC', 'AAMS', 'CMFC',
+        'Java Certified', 'Oracle Certified', 'Microsoft Certified', 'Cisco Certified', 'Adobe Certified'
+    ]
+    
+    certifications = []
+
+    # Keywords and patterns indicating non-certifications (achievements, awards, descriptions)
+    non_cert_keywords = [
+        'achievement', 'award', 'recognition', 'honor', 'scholarship', 'appreciation', 'merit',
+        'valuable player', 'outstanding performance', 'exceptional performance', 'star performer',
+        'dean\'s list', 'president\'s list', 'commendation', 'glory', 'kudos', 'winner', 'finalist',
+        'top performer', 'employee of the month', 'employee of the year', 'cgpa', 'rank'
+    ]
+    non_cert_patterns = [
+        r'^(For|Received|Awarded for|In recognition of|Certificate of (Achievement|Appreciation|Excellence))\b',
+        r'\b(won|earned|secured|achieved|received)\s+(?:a|an|the|first|second|third|gold|silver|bronze)\b',
+        r'\b(Xth|XIIth|SSC|HSC)\b', r'scoring \d+%', r'\b[A-Z]{2,15}\b' # Short all-caps likely headers unless in common_certs
+    ]
+    # Section headers to explicitly ignore if they are not part of a certification title
+    general_section_headers = [
+        'ACHIEVEMENTS', 'AWARDS', 'RECOGNITIONS', 'HONORS', 'ACCOMPLISHMENTS', 'PROJECTS',
+        'PUBLICATIONS', 'EXPERIENCE', 'EDUCATION', 'SKILLS', 'SUMMARY', 'OBJECTIVE'
+    ]
+    
+    # First try to extract certification section
+    for pattern in cert_section_patterns:
+        matches = re.search(pattern, raw_text, re.IGNORECASE | re.MULTILINE)
+        if matches:
+            section_text = matches.group(1).strip()
+            # Split into lines and clean
+            lines = [line.strip() for line in section_text.split('\n') if line.strip()]
+            # Process each line
+            for line in lines:
+                # Skip lines that are too short
+                if len(line) < 3:
+                    continue
+                # Skip lines that are headers or contain no actual certification
+                if re.match(r'^\s*(?:CERTIFICATIONS?|LICENSES?|ACCREDITATIONS?)\s*$', line, re.IGNORECASE):
+                    continue
+                # Clean up bullets and other markers
+                line = re.sub(r'^[•\-\*\+\>\→\»]\s*', '', line).strip()
+                
+                # Pre-filter: if line itself is a general section header (and not a known cert like 'PMP')
+                # and doesn't contain specific certification keywords, skip it.
+                is_common_cert_abbr = any(re.fullmatch(re.escape(cert_abbr), line, re.IGNORECASE) for cert_abbr in common_certs)
+                if line.upper() in general_section_headers and not is_common_cert_abbr:
+                    if not any(kw.lower() in line.lower() for kw in ['certified', 'certificate', 'diploma', 'license', 'accredited', 'chartered']): 
+                        continue
+
+                # Check against non-certification keywords and patterns
+                is_non_cert = False
+                for kw in non_cert_keywords:
+                    if re.search(r'\b' + re.escape(kw) + r'\b', line, re.IGNORECASE):
+                        is_non_cert = True
+                        break
+                if is_non_cert: continue
+
+                for pat in non_cert_patterns:
+                    # Special handling for all-caps pattern: only a non-cert if not in common_certs
+                    if pat == r'\b[A-Z]{2,15}\b': 
+                        if re.fullmatch(pat, line) and not is_common_cert_abbr:
+                            is_non_cert = True
+                            break
+                    elif re.search(pat, line, re.IGNORECASE):
+                        is_non_cert = True
+                        break
+                if is_non_cert: continue
+
+                # Add if not already in list and passes filters
+                if line and line not in certifications:
+                    certifications.append(line)
+            # If we found certifications, return them
+            if certifications:
+                safe_log(f"Extracted certifications from section: {certifications}", level='debug')
+                return certifications
+    
+    # General search for certifications
+    candidate_lines = []
+    for line_num, line_text in enumerate(raw_text.split('\n')):
+        line_text = line_text.strip()
+        if not line_text or len(line_text) < 5:
+            continue
+        
+        line_text_cleaned = re.sub(r'^[•\-\*\+\>\→\»]\s*', '', line_text) # Clean bullets
+
+        # Check if any common cert is mentioned
+        contains_common_cert = False
+        for cert_name in common_certs:
+            # Handle raw strings like r'A+' in common_certs list
+            processed_cert_name = cert_name.replace(r'\+', '+').replace(r'\.', '.')
+            if re.search(r'\b' + re.escape(processed_cert_name) + r'\b', line_text_cleaned, re.IGNORECASE):
+                contains_common_cert = True
+                break
+        
+        # Check if it broadly looks like a certification entry
+        looks_like_cert_entry = contains_common_cert or \
+                               re.search(r'\b(Certifi(?:cate|cation|ed)|Diploma|Licensed?|Accredited|Chartered)\b', line_text_cleaned, re.IGNORECASE)
+
+        if looks_like_cert_entry:
+            # Filter out non-certifications
+            is_non_cert = False
+            for kw in non_cert_keywords:
+                if re.search(r'\b' + re.escape(kw) + r'\b', line_text_cleaned, re.IGNORECASE):
+                    is_non_cert = True
+                    break
+            if is_non_cert: continue
+
+            for pat in non_cert_patterns:
+                is_common_cert_abbr = any(re.fullmatch(re.escape(cert_abbr.replace(r'\+','+')), line_text_cleaned, re.IGNORECASE) for cert_abbr in common_certs)
+                if pat == r'\b[A-Z]{2,15}\b':
+                    if re.fullmatch(pat, line_text_cleaned) and not is_common_cert_abbr:
+                        is_non_cert = True
+                        break
+                elif re.search(pat, line_text_cleaned, re.IGNORECASE):
+                    is_non_cert = True
+                    break
+            if is_non_cert: continue
+            
+            # Avoid very long descriptive lines unless they clearly contain a common_cert
+            if len(line_text_cleaned.split()) > 15 and not contains_common_cert:
+                continue
+
+            if line_text_cleaned not in certifications:
+                certifications.append(line_text_cleaned)
+    
+    if certifications:
+        # Remove duplicates while preserving order for the final list from this general search
+        final_certs_general = []
+        seen = set()
+        for cert in certifications:
+            if cert not in seen:
+                final_certs_general.append(cert)
+                seen.add(cert)
+        
+        safe_log(f"Extracted certifications by general keyword search: {final_certs_general}", level='debug')
+        return final_certs_general
+    
+    return certifications
+
+def clean_phone(phone):
+    """Clean and format phone numbers"""
+    if not phone:
+        return "Not provided"
+        
+    # Remove all non-numeric characters except the + sign
+    if isinstance(phone, str):
+        # Keep only digits, +, and standard separators
+        digits_only = re.sub(r'[^\d\+\-\(\)\s\.]', '', phone)
+        # Remove words that might have been included
+        digits_only = re.sub(r'[a-zA-Z]', '', digits_only)
+        # Clean extra spaces and separators
+        digits_only = re.sub(r'[\s\-\.]+', ' ', digits_only).strip()
+        
+        # Check if we have a reasonably looking phone number
+        if re.search(r'\+?\d{6,}', digits_only):
+            return digits_only
+    
+    return "Not provided"
+
+def ensure_linkedin_url_formatting(url):
+    """Ensure LinkedIn URL has correct formatting"""
+    if not url or 'linkedin' not in url.lower():
+        return url
+        
+    # If starts with "www" or "linkedin" without protocol, add https://
+    if url.lower().startswith('www') or url.lower().startswith('linkedin'):
+        url = 'https://' + url
+        
+    # Add www.linkedin.com if just linkedin.com is provided
+    if 'linkedin.com' in url.lower() and 'www.linkedin' not in url.lower():
+        url = url.replace('linkedin.com', 'www.linkedin.com')
+        
+    return url
+    
+def looks_like_address(text):
+    """Determine if a text looks like an address"""
+    if not text or len(text) < 5:
+        return False
+    
+    # Addresses often have these characteristics
+    has_number = bool(re.search(r'\d', text))  # Contains a number (e.g. house number, PIN)
+    has_location_words = bool(re.search(r'(?:street|road|lane|avenue|block|sector|district|area|colony|apartments|flats|towers)', text, re.IGNORECASE))
+    contains_pin_code = bool(re.search(r'\b\d{5,7}\b', text))  # Contains a 5-7 digit number (PIN/ZIP code)
+    has_commas = text.count(',') >= 1  # Often addresses have commas separating parts
+    
+    # Score the features
+    score = 0
+    if has_number: score += 1
+    if has_location_words: score += 2
+    if contains_pin_code: score += 3
+    if has_commas: score += 1
+    
+    # Negative signals - looks more like job description
+    contains_action_verbs = bool(re.search(r'\b(?:develop|create|implement|work|using|design)\b', text, re.IGNORECASE))
+    contains_tech_terms = bool(re.search(r'\b(?:software|hardware|data|cloud|API|system|framework|database)\b', text, re.IGNORECASE))
+    
+    if contains_action_verbs: score -= 2
+    if contains_tech_terms: score -= 2
+    
+    return score >= 2  # Threshold for address-like text
+
+def is_likely_job_description(text):
+    """Check if the text is likely a job description or experience statement rather than an address"""
+    if not text:
+        return False
+        
+    # Normalize text for comparison
+    normalized_text = text.lower().strip()
+    
+    # Short-circuit for text that looks like an address with PIN code or city/state
+    # This helps avoid false positives
+    if re.search(r'\b\d{5,6}\b', normalized_text) and re.search(r'\b(?:street|road|avenue|lane|apartment|district|city|state)\b', normalized_text, re.IGNORECASE):
+        safe_log(f"Text looks like address with PIN code and address keywords: {text[:50]}...", level='debug')
+        return False
+    
+    # IMMEDIATE IDENTIFIER CASES
+    # These are special patterns that are immediately identifiable
+    
+    # 1. Single word country names or common non-address values when they appear alone
+    if normalized_text in ['india', 'usa', 'canada', 'uk', 'not mentioned', 'not provided']:
+        return True  # These are not valid addresses
+    
+    # 2. Direct match against our problematic examples
+    problematic_patterns = [
+        r'having\s+\d+\+?\s*years?\s+of\s+experience',  # "Having 4+ years of experience"
+        r'\d+\+?\s*years?\s+of\s+experience',         # "4+ years of experience"
+        r'worked\s+(?:directly|with|on)\s+(?:customer|client)',  # "Worked directly with customers"
+        r'analyzed\s+(?:the\s+)?root\s+cause',          # "Analyzed the root cause"
+        r'resolve\s+(?:issues|blockers|tickets)',        # "Resolve issues/blockers"
+    ]
+    
+    for pattern in problematic_patterns:
+        if re.search(pattern, normalized_text, re.IGNORECASE):
+            safe_log(f"Matched job description pattern: {pattern} in: {text[:50]}...", level='debug')
+            return True  # Explicitly match known experience statements
+    
+    # 3. Technology and job role mentions - extremely high confidence indicators
+    specific_tech_terms = [
+        'iics', 'informatica', 'power center', 'etl developer',
+        'agile', 'sprint', 'scrum', 'jira', 'confluence', 'ticketing',
+        'implemented', 'developed', 'designed', 'maintained', 'managed'
+    ]
+    
+    # Check for specific terms that indicate job descriptions along with context
+    tech_term_count = 0
+    for term in specific_tech_terms:
+        if term in normalized_text:
+            tech_term_count += 1
+            if tech_term_count >= 2:  # Require at least 2 tech terms to avoid false positives
+                safe_log(f"Found multiple tech terms in potential job description: {text[:50]}...", level='debug')
+                return True
+    
+    # GENERAL PATTERN DETECTION
+    # More general patterns that indicate job descriptions
+    
+    # 1. Experience statements
+    experience_patterns = [
+        r'\bhaving\s+\w+\s+experience\b',             # "Having extensive experience"
+        r'\bexperience(?:d)?\s+(?:in|with)\b',        # "Experienced in/with"
+        r'\byears?\s+experience\b',                   # "years experience"
+        r'\bworked\s+(?:on|for|with|in|at)\b',        # "worked for/with"
+        r'\bskills?\s+(?:in|with)\b',                 # "skills in/with"
+        r'\bdeveloper\b',                             # "developer"
+        r'\bengineer\b',                              # "engineer"
+    ]
+    
+    for pattern in experience_patterns:
+        if re.search(pattern, normalized_text, re.IGNORECASE):
+            return True
+    
+    # 2. General technology terms
+    tech_terms = [
+        'java', 'python', 'javascript', 'react', 'angular', 'node', 'aws',
+        'cloud', 'sql', 'database', 'frontend', 'backend', 'fullstack',
+        'development', 'programming', 'software', 'hardware', 'testing'
+    ]
+    
+    tech_term_count = sum(1 for term in tech_terms if term in normalized_text)
+    if tech_term_count > 0:
+        return True
+    
+    # ADDRESS POSITIVE IDENTIFICATION
+    # If it passes all the above tests, check if it has address characteristics
+    
+    # Address typically has these indicators
+    address_indicators = ['street', 'road', 'avenue', 'lane', 'drive', 'p.o.', 'post', 
+                          'box', 'apartment', 'apt', 'flat', 'floor', 'unit', 'building', 
+                          'block', 'samabay', 'pally', 'howrah', 'pin', 'bally']
+    
+    # Check for PIN/ZIP code pattern (5-7 digits)
+    has_pin_code = bool(re.search(r'\b\d{5,7}\b', normalized_text))
+    
+    # If it has address indicators or a PIN code, it's likely an address
+    for indicator in address_indicators:
+        if indicator in normalized_text:
+            return False  # This is likely an address
+            
+    if has_pin_code:
+        return False  # Contains a PIN/ZIP code, likely an address
+    
+    # If we can't confidently identify it as an address, default to job description
+    # This helps avoid false positives in address detection
+    return True
+    if job_signal_count >= 3:
+        return True  # Strong job content signals
+    
+    return False  # Default to not being a job description
+
+def extract_skills(text):
+    """Extract skills from resume text"""
+    # Common tech skills to look for
+    tech_skills = [
+        "python", "java", "javascript", "typescript", "c#", "c++", "ruby", "php", "go", "rust",
+        "aws", "azure", "gcp", "cloud", "docker", "kubernetes", "terraform", "jenkins", "git",
+        "react", "angular", "vue", "node", "express", "django", "flask", "spring", "hibernate",
+        "sql", "mysql", "postgresql", "mongodb", "oracle", "redis", "elasticsearch", "graphql",
+        "html", "css", "sass", "webpack", "babel", "jquery", "bootstrap", "tailwind", "material-ui",
+        "machine learning", "ai", "deep learning", "nlp", "computer vision", "tensorflow", "pytorch",
+        "data science", "big data", "apache spark", "hadoop", "kafka", "tableau", "power bi", "excel"
+    ]
+    
+    skills_found = []
+    lower_text = text.lower()
+    
+    for skill in tech_skills:
+        if re.search(r'\b' + re.escape(skill) + r'\b', lower_text):
+            skills_found.append(skill)
+    
+    # If no tech skills found, try to extract from skills section
+    if not skills_found:
+        skills_section = re.search(r'(?:technical skills|skills|expertise|proficiencies)[:\s]+(.*?)(?:\n\n|\n[A-Z])', text, re.IGNORECASE | re.DOTALL)
+        if skills_section:
+            # Split skills by common separators and clean up
+            raw_skills = re.split(r'[,;•|]', skills_section.group(1))
+            skills_found = [s.strip() for s in raw_skills if len(s.strip()) > 2 and len(s.strip()) < 30][:10]  # Limit to 10 skills
+    
+    return skills_found
+
+def extract_summary(text):
+    """Extract a professional summary"""
+    summary_section = re.search(r'(?:professional summary|summary|profile|objective)[:\s]+(.*?)(?:\n\n|\n[A-Z])', text, re.IGNORECASE | re.DOTALL)
+    if summary_section:
+        summary = summary_section.group(1).strip()
+        # Limit to a reasonable length
+        return summary[:300] + ('...' if len(summary) > 300 else '')
+    return "Not provided"
+
+def extract_years_from_positions(positions):
+    """Calculate years of experience from position information
+    Args:
+        positions: A list of position strings or a string containing position information
+    Returns:
+        A float representing total years of experience
+    """
+    if not positions:
+        return 0.0
+        
+    # If positions is a list, convert to a single string for processing
+    if isinstance(positions, list):
+        positions_text = "\n".join(positions)
+    else:
+        positions_text = positions
+    
+    # Look for years in position descriptions
+    years_pattern = r'(\d+)\+?\s*(?:years|yrs)'
+    year_matches = re.findall(years_pattern, positions_text, re.IGNORECASE)
+    
+    # If we found explicit years, use the highest value
+    if year_matches:
+        try:
+            years = [float(y) for y in year_matches]
+            return max(years)
+        except (ValueError, TypeError):
+            pass
+    
+    # Look for date ranges in position descriptions
+    date_ranges = re.findall(r'((?:19|20)\d{2})\s*(?:-|to|–)\s*((?:19|20)\d{2}|present|current|now)', positions_text, re.IGNORECASE)
+    
+    if date_ranges:
+        total_years = 0.0
+        current_year = datetime.now().year
+        
+        for start_year, end_year in date_ranges:
+            try:
+                start = int(start_year)
+                # Handle 'present' or 'current' in end date
+                if re.match(r'^(?:19|20)\d{2}$', end_year):
+                    end = int(end_year)
+                else:
+                    end = current_year
+                    
+                # Add experience years from this position
+                position_years = end - start
+                if 0 <= position_years <= 50:  # Sanity check
+                    total_years += position_years
+            except (ValueError, TypeError):
+                continue
+        
+        return round(total_years, 1) if total_years > 0 else 0.0
+    
+    # If no explicit years or date ranges found, use heuristics
+    # Count senior positions as more experience
+    if re.search(r'\b(?:senior|sr|lead|principal|manager|head|chief|director)\b', positions_text, re.IGNORECASE):
+        return 5.0  # Assume senior roles have at least 5 years
+    
+    # Check for words indicating experience level
+    if re.search(r'\b(?:experienced|seasoned|veteran)\b', positions_text, re.IGNORECASE):
+        return 3.0  # Assume experienced roles have at least 3 years
+    
+    # Default assumption for any position
+    return 1.0
+
+def extract_experience_years(text):
+    """Extract years of experience from text
+    Returns a float representing years of experience"""
+    if not text:
+        return 0.0
+    
+    # Direct mentions of years of experience - broader set of patterns
+    experience_patterns = [
+        # Indian resume specific formats
+        r'(?:total\s*(?:work\s*)?experience)\s*(?:[-:])\s*(\d+(?:[.]\d+)?)\s*(?:years?|yrs?)(?:\s*(?:and)?\s*(\d+)\s*months?)?',
+        r'(?:experience\s*(?:summary|details))\s*(?:[-:])\s*(\d+(?:[.]\d+)?)\s*(?:years?|yrs?)(?:\s*(?:and)?\s*(\d+)\s*months?)?',
+        r'(?:professional(?:\s*work)?\s*experience)\s*(?:[-:])\s*(\d+(?:[.]\d+)?)\s*(?:years?|yrs?)(?:\s*(?:and)?\s*(\d+)\s*months?)?',
+        r'(?:experience)\s*(?:[-:])\s*(\d+(?:[.]\d+)?)\s*(?:years?|yrs?)(?:\s*(?:and)?\s*(\d+)\s*months?)?',
+        r'(?:(?:total|professional|work|industry)\s*experience)\s*(?:[-:])\s*(\d+(?:[.]\d+)?)\s*(?:years?|yrs?)(?:\s*(?:and)?\s*(\d+)\s*months?)?',
+        r'(\d+(?:[.]\d+)?)\s*(?:years?|yrs?)\s*(?:and)?\s*(\d+)\s*months?\s*(?:of)?\s*(?:experience|exp)',
+        # Standard patterns with decimal support
+        r'(\d+(?:[.]\d+)?)\+?\s*(?:years|yrs)\s*(?:of)?\s*(?:work\s*)?(?:experience)',
+        r'(?:with|having|possess(?:ing)?)\s*(\d+(?:[.]\d+)?)\+?\s*(?:years|yrs)\s*(?:of)?\s*(?:professional|work|industry)?\s*(?:experience)',
+        r'(?:experience|professional)\s*(?:of|with)?\s*(\d+(?:[.]\d+)?)\+?\s*(?:years|yrs)',
+        # Additional patterns for years and months format
+        r'(?:experience|exp)(?:\s*:)?\s*(\d+)\s*(?:yrs?|years?)\s*(\d+)\s*(?:mos?|months?)',
+        r'(\d+)\s*(?:yrs?|years?)\s*(\d+)\s*(?:mos?|months?)\s*(?:experience|exp)',
+        # Patterns with experience descriptions like "X years Y months"
+        r'(\d+(?:[.]\d+)?)\s*(?:years?|yrs?)(?:\s*,?\s*(?:and)?\s*(\d+)\s*months?)?\s*(?:of)?\s*(?:experience|exp)',
+        # Cover additional formats like "over X years"
+        r'(?:over|more than)\s*(\d+(?:[.]\d+)?)\s*(?:years?|yrs?)\s*(?:of)?\s*(?:experience|exp)'
+    ]
+    
+    # Try to extract from the first few lines which often contain the experience summary in Indian resumes
+    first_500_chars = text[:500].lower()
+    for pattern in experience_patterns:
+        match = re.search(pattern, first_500_chars, re.IGNORECASE)
+        if match:
+            years = float(match.group(1))
+            # If months are captured (for patterns with month groups)
+            if len(match.groups()) > 1 and match.group(2) and match.group(2).isdigit():
+                years += float(match.group(2)) / 12.0
+            return years
+    
+    # Then try the full text
+    for pattern in experience_patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            years = float(match.group(1))
+            # If months are captured (for patterns with month groups)
+            if len(match.groups()) > 1 and match.group(2) and match.group(2).isdigit():
+                years += float(match.group(2)) / 12.0
+            return years
+    
+    # For experience mentioned in summary section if direct mentions not found
+    summary = extract_summary(text)
+    if summary:
+        for pattern in experience_patterns:
+            match = re.search(pattern, summary, re.IGNORECASE)
+            if match:
+                years = float(match.group(1))
+                # If months are captured (for patterns with month groups)
+                if len(match.groups()) > 1 and match.group(2) and match.group(2).isdigit():
+                    years += float(match.group(2)) / 12.0
+                return years
+    
+    # If no years found yet, extract it from the job history if available
+    years = extract_years_from_positions(text)
+    if years > 0:
+        return years
+    
+    # If years still not found, use a guessed value based on the number of positions
+    # mentioned in the text
+    positions = extract_positions(text)  
+    if positions:
+        return min(len(positions) * 1.5, 12)  # Estimate based on positions, capped at 12 years
+    
+    return 0
+
+def extract_positions(text):
+    """Extract job positions with improved filtering to avoid false positives"""
+    # Common job titles
+    positions = []
+    
+    # Look for job titles near company names or dates
+    job_matches = re.finditer(r'((?:Senior|Lead|Principal|Junior)?\s*(?:Software|Systems|Data|Full[ -]Stack|Front[ -]End|Back[ -]End|DevOps|Cloud|Network|Security)?\s*(?:Engineer|Developer|Architect|Analyst|Scientist|Consultant|Designer|Specialist))', text, re.IGNORECASE)
+    
+    # Handle manager positions separately with more careful validation
+    manager_matches = re.finditer(r'((?:Senior|Lead|Project|Product|Technical|IT|Engineering)\s+Manager\b)', text, re.IGNORECASE)
+    
+    # First collect regular positions (non-manager)
+    for match in job_matches:
+        position = match.group(1).strip()
+        if position and position.lower() not in [p.lower() for p in positions] and len(position) > 5:
+            positions.append(position.title())  # Title case for consistency
+    
+    # Now check for manager positions with stricter validation
+    for match in manager_matches:
+        manager_position = match.group(1).strip()
+        
+        # Verify it's a legitimate manager position - look for supporting context
+        # Check for phrases that indicate actual management experience
+        manager_evidence = [
+            r'manag(?:ed|ing)\s+(?:team|project|department)',
+            r'team\s+of\s+\d+',
+            r'lead(?:ing)?\s+(?:team|project|development)',
+            r'responsib(?:le|ilities)\s+for\s+(?:team|project|department)'
+        ]
+        
+        # Only include if there's supporting evidence
+        has_evidence = False
+        
+        # Look within a reasonable context around the manager mention
+        context_start = max(0, text.find(manager_position) - 200)
+        context_end = min(len(text), text.find(manager_position) + 200)
+        context = text[context_start:context_end]
+        
+        for evidence_pattern in manager_evidence:
+            if re.search(evidence_pattern, context, re.IGNORECASE):
+                has_evidence = True
+                break
+        
+        if has_evidence and manager_position.lower() not in [p.lower() for p in positions]:
+            positions.append(manager_position.title())
+    
+    # Filter out any positions that might be part of a company name
+    final_positions = []
+    for position in positions:
+        # Skip if it looks like part of company name "XXX Company Manager"
+        if not re.search(r'(?:Company|Corporation|Inc|Ltd)\s+' + re.escape(position), text, re.IGNORECASE):
+            final_positions.append(position)
+    
+    # Limit to top 3 most relevant positions
+    return final_positions[:3]
+
+def extract_summary(text):
+    """Extract professional summary from resume text
+    Returns a string representing the professional summary"""
+    if not text:
+        return "Not provided"
+    
+    # Look for sections that might contain summary
+    summary_section_headers = [
+        "Professional Summary", "Summary", "Profile", "Professional Profile", 
+        "Career Summary", "Career Objective", "Objective", "About Me", "Experience Summary"
+    ]
+    
+    # First try to find labeled summary sections
+    for header in summary_section_headers:
+        # Try to find the section with the header
+        pattern = re.compile(f"{header}\\s*(?:[-:])?\\s*(.*?)(?:\\n\\n|\\n[A-Z][A-Z\\s]+(?:[-:])|$)", re.DOTALL | re.IGNORECASE)
+        match = pattern.search(text)
+        if match:
+            summary_text = match.group(1).strip()
+            if len(summary_text) > 20:  # Only use if it's substantial
+                return summary_text.replace('\n', ' ').strip()
+    
+    # If no labeled section found, try to find the first substantive paragraph after contact info
+    # This is often a summary in many resumes
+    lines = text.split('\n')
+    in_contact_section = True
+    potential_summary = ""
+    
+    for i, line in enumerate(lines):
+        line = line.strip()
+        
+        # Skip empty lines
+        if not line:
+            continue
+            
+        # Skip contact info section
+        if re.search(r'(?:NAME|email|e-mail|phone|mobile|address|location)\s*[-:]', line, re.IGNORECASE):
+            in_contact_section = True
+            continue
+            
+        # Once we're past contact info, the first substantive paragraph is often the summary
+        if in_contact_section and len(line) > 30 and i > 5:  # Skip header lines
+            in_contact_section = False
+            potential_summary = line
+            
+            # Try to collect multiple lines if they form a paragraph
+            j = i + 1
+            while j < len(lines) and len(lines[j].strip()) > 0:
+                potential_summary += " " + lines[j].strip()
+                j += 1
+                
+            if len(potential_summary) > 50:  # Only use if it's substantial
+                return potential_summary
+    
+    # If we still don't have a good summary, try to extract from the beginning of the document
+    # after skipping obvious header/contact info
+    clean_text = re.sub(r'CONTACT_INFO:\s*[^\n]+', '', text[:1000])
+    paragraphs = re.split(r'\n\s*\n', clean_text)
+    
+    for para in paragraphs:
+        para = para.strip()
+        if len(para) > 50 and not re.search(r'NAME:|email|phone|address', para, re.IGNORECASE):
+            # Check if it looks like a summary (has keywords like experience, skills, etc.)
+            if re.search(r'experience|professional|skills|expertise|knowledge|develop|career', para, re.IGNORECASE):
+                return para.replace('\n', ' ').strip()
+    
+    # Fallback - if nothing better found, check for any mention of experience or skills
+    exp_matches = re.search(r'(?:having|with)\s+\d+(?:\+|\s*\+)?\s*years?\s+(?:of\s+)?experience[^\n]*', text, re.IGNORECASE)
+    if exp_matches:
+        summary = exp_matches.group(0)
+        if len(summary) > 30:
+            return summary
+    
+    # Final fallback - generate a generic professional summary based on available info
+    skills = extract_skills(text)
+    if skills:
+        skills_str = ", ".join(skills[:3])
+        return f"Professional with expertise in {skills_str} and related technologies."
+    
+    return "Not provided"
+
+def extract_education(text):
+    """Extract education information from resume text
+    Returns a list of education entries, each with degree, school, and optional year"""
+    if not text:
+        return []
+    
+    # Common degree terms and abbreviations, including Indian degrees
+    degree_terms = [
+        # International degrees
+        'Bachelor', 'BS', 'BA', 'B.S.', 'B.A.', 'BSc', 'B.Sc',
+        'Master', 'MS', 'MA', 'MSc', 'M.S.', 'M.A.', 'M.Sc',
+        'PhD', 'Ph.D', 'Doctorate', 'MBA', 'Associate', 'Diploma',
+        'Certificate', 'Certification', 'Graduate', 'Undergraduate',
+        # Indian specific degrees
+        'B.Tech', 'M.Tech', 'B.E.', 'M.E.', 'Engineering', 'BCA', 'MCA',
+        'B.Com', 'M.Com', 'B.Sc', 'M.Sc', 'BBA', 'BBM', 'PGDM', 'PGDBM',
+        # Indian high school education
+        '12th', 'XII', '10th', 'X', 'HSC', 'SSC', 'HSSC', 'Higher Secondary', 'Secondary',
+        'Intermediate', 'Senior Secondary', 'Matriculation'
+    ]
+    
+    # Indian education boards and terms
+    indian_edu_terms = [
+        'CBSE', 'ICSE', 'ISC', 'State Board', 'AICTE', 'UGC', 'JNTU', 'VTU', 'Anna University',
+        'CGPA', 'SGPA', 'percentage', '%', 'marks', 'aggregate', 'grade', 'Class', 'Division',
+        'First Class', 'Second Class', 'Distinction', 'Batch of', 'Passing Year', 'Pass out',
+        'University', 'College', 'Institute', 'School of', 'Department of', 'ITI', 'Polytechnic'
+    ]
+    
+    # Regex patterns for education extraction
+    education_patterns = [
+        # Indian specific patterns
+        # Direct academic profile with graduation/university pattern
+        r'(?:Completed|Pursued)\s+(?:Graduation|Graduate|B\.Tech|B\.E\.|Degree)\s+from\s+([A-Za-z\s&\.,]+)(?:[^\(\n]*?)(?:\(([A-Za-z\s&\.,]+)\)|$)',
+        
+        # Pattern for B.Tech/B.E./M.Tech with university and year
+        r'(?:(?:completed|pursued|studied)\s+)?((?:B\.Tech|B\.E\.|M\.Tech|MCA|BCA|B\.Sc|M\.Sc)(?:\s+(?:in|from))?\s+[A-Za-z\s]+)(?:\s+(?:from|at)\s+)([A-Z][A-Za-z\s&\.,]+)(?:[^\n]*?)(\d{4}(?:\s*[-–]\s*\d{4})?)',
+        
+        # Indian 10th/12th standard pattern with board and percentage
+        r'(?:(?:Class|Standard|Grade)\s+)?((?:10th|12th|X|XII|SSC|HSC|Secondary|Higher Secondary|Intermediate))[^\n]*?(?:from|at)?\s+([A-Z][A-Za-z\s&\.,]+)(?:[^\n]*?)(\d{2,4})(?:[^\n]*?)(\d{2}(?:\.\d+)?\s*%|\d{1,2}(?:\.\d+)?\s*CGPA)',
+        
+        # CGPA or percentage pattern
+        r'([A-Za-z.\s]+(?:Engineering|Technology|University|College|Institute))(?:[^\n]*?)(?:with|secured|obtained)?\s*(\d{1,2}(?:\.\d+)?\s*CGPA|\d{2,3}(?:\.\d+)?\s*%|(?:First|Second)\s+Class(?:\s+with\s+Distinction)?)',
+        
+        # Special case for Academic Profile section
+        r'Academic\s+Profile[:\s]*[\n\s]*(.*?)(?=\n\n|PROFESSIONAL|EXPERIENCE|$)',
+        
+        # Standard patterns (international formats)
+        # Degree at/from Institution (year pattern)
+        r'(?:(?:earned|received|completed)\s+)?((?:[A-Z][A-Za-z\.]*\s+)*(?:' + '|'.join(degree_terms) + r')(?:\s+[A-Za-z\.]*)*\s+(?:in|of|from)?\s+[A-Za-z\s]+)\s+(?:from|at)\s+([A-Z][A-Za-z\s&\.,]+?)(?:\s+(?:in|\(|,)\s*(\d{4}))?',
+        
+        # Institution - Degree pattern
+        r'([A-Z][A-Za-z\s&\.,]+?)\s*(?:[-–]|:)\s*((?:[A-Z][A-Za-z\.]*\s+)*(?:' + '|'.join(degree_terms) + r')(?:\s+[A-Za-z\.]*)*(?:\s+in\s+[A-Za-z\s]+)?)',
+        
+        # Education section header followed by degree and school
+        r'(?:EDUCATION|ACADEMIC|QUALIFICATION)\s*(?::|\n)(.*?)(?:\n\n|$)',
+        
+        # Common degree formats with year
+        r'((?:' + '|'.join(degree_terms) + r')(?:\s+[A-Za-z\.]*)*\s+(?:in|of)?\s+[A-Za-z\s]+),\s*([A-Z][A-Za-z\s&\.,]+?)(?:\s*[\(\[]?\s*(\d{4}))?'
+    ]
+    
+    education_entries = []
+    
+    # Identify education section
+    education_section = None
+    section_headings = re.finditer(r'(EDUCATION|ACADEMIC|QUALIFICATIONS|DEGREES)[:\s]*\n+(.*?)(?=\n+[A-Z][A-Z\s]+[:\s]*\n+|$)', text, re.DOTALL | re.IGNORECASE)
+    
+    for match in section_headings:
+        education_section = match.group(2)
+        if education_section:
+            break
+    
+    # First try to extract from education section if found
+    if education_section:
+        lines = education_section.strip().split('\n')
+        current_entry = {}
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Look for degree information
+            degree_match = any(term.lower() in line.lower() for term in degree_terms)
+            year_match = re.search(r'\b(19|20)\d{2}\b', line)
+            
+            # If this line contains degree info
+            if degree_match:
+                # If we already have an entry in progress, save it before starting new one
+                if current_entry and 'degree' in current_entry:
+                    education_entries.append(current_entry)
+                    current_entry = {}
+                
+                current_entry['degree'] = line
+                if year_match:
+                    current_entry['year'] = year_match.group(0)
+                    # Remove year from degree text to avoid duplication
+                    current_entry['degree'] = re.sub(r'\b' + year_match.group(0) + r'\b', '', current_entry['degree']).strip()
+            
+            # If line appears to be school name (starts with capital letter, no degree terms)
+            elif line and line[0].isupper() and not degree_match and 'school' not in current_entry:
+                current_entry['school'] = line
+            
+            # Just a year on its own line
+            elif year_match and 'year' not in current_entry:
+                current_entry['year'] = year_match.group(0)
+        
+        # Don't forget to add the last entry
+        if current_entry and 'degree' in current_entry:
+            education_entries.append(current_entry)
+    
+    # If we couldn't find structured education entries, try pattern matching on whole text
+    if not education_entries:
+        for pattern in education_patterns:
+            matches = re.finditer(pattern, text)
+            for match in matches:
+                if len(match.groups()) >= 2:
+                    entry = {}
+                    
+                    # Different patterns have different group structures
+                    if 'EDUCATION' in pattern:
+                        # Process the education section text
+                        section_text = match.group(1)
+                        section_lines = section_text.strip().split('\n')
+                        
+                        for i, line in enumerate(section_lines):
+                            # Look for degree patterns in each line
+                            degree_match = re.search(r'((?:' + '|'.join(degree_terms) + r')(?:\s+[A-Za-z\.]*)*)', line, re.IGNORECASE)
+                            year_match = re.search(r'\b(19|20)\d{2}\b', line)
+                            
+                            if degree_match:
+                                entry['degree'] = degree_match.group(0)
+                                # The rest might be the school
+                                school_text = line.replace(degree_match.group(0), '').strip(' ,-:')
+                                if school_text:
+                                    entry['school'] = school_text
+                                
+                                if year_match:
+                                    entry['year'] = year_match.group(0)
+                                
+                                if 'degree' in entry:
+                                    education_entries.append(entry)
+                                    entry = {}
+                    else:
+                        # Standard patterns with degree and school
+                        if any(term.lower() in match.group(1).lower() for term in degree_terms):
+                            entry['degree'] = match.group(1).strip()
+                            entry['school'] = match.group(2).strip()
+                        else:
+                            entry['school'] = match.group(1).strip()
+                            entry['degree'] = match.group(2).strip()
+                        
+                        # Check for year if available
+                        if len(match.groups()) >= 3 and match.group(3) and re.match(r'\d{4}', match.group(3)):
+                            entry['year'] = match.group(3)
+                        
+                        education_entries.append(entry)
+    
+    # Convert dictionary entries to expected format
+    formatted_entries = []
+    for entry in education_entries:
+        if 'degree' in entry or 'school' in entry:
+            # Special handling for Indian education format with location in parentheses
+            if entry.get('degree') and ('Pradesh' in entry.get('degree') or 'Karnataka' in entry.get('degree') or 
+                                        'Tamil Nadu' in entry.get('degree') or 'Maharashtra' in entry.get('degree')):
+                # This is likely a location, not a degree
+                formatted_entry = {
+                    'degree': 'Bachelor\'s Degree',  # Default to Bachelor's since it's a graduation
+                    'school': entry.get('school', '') + ', ' + entry.get('degree', '')
+                }
+            else:
+                formatted_entry = {
+                    'degree': entry.get('degree', 'Degree not specified'),
+                    'school': entry.get('school', 'Institution not specified')
+                }
+                
+            if 'year' in entry:
+                formatted_entry['year'] = entry['year']
+            
+            formatted_entries.append(formatted_entry)
+    
+    # Deduplicate entries
+    unique_entries = []
+    seen = set()
+    
+    for entry in formatted_entries:
+        # Create a hashable key from the entry
+        key = (entry.get('degree', ''), entry.get('school', ''))
+        if key not in seen:
+            seen.add(key)
+            unique_entries.append(entry)
+    
+    return unique_entries
+
+def extract_companies(text):
+    """Extract company names from text"""
+    if not text:
+        return []
+    
+    companies = []
+    
+    # Common technology, skill, or general terms that should not be identified as companies
+    non_company_terms = [
+        "application development", "web development", "software development", 
+        "problem solving", "programming", "coding", "technology", "development",
+        "python", "java", "javascript", "html", "css", "react", "node", "angular", 
+        "data science", "machine learning", "artificial intelligence", "ai", "ml",
+        "cloud computing", "aws", "azure", "google cloud", "devops", "agile",
+        "database", "sql", "nosql", "mongodb", "mysql", "postgresql", "oracle",
+        "big data", "data analysis", "data visualization", "tableau", "power bi",
+        "project management", "team leadership", "communication", "collaboration",
+        "network", "security", "cyber security", "infrastructure", "systems",
+        "automation", "testing", "qa", "quality assurance", "ui", "ux", "design",
+        "full stack", "frontend", "backend", "mobile", "ios", "android", "app",
+        "software", "hardware", "network", "systems", "engineering", "research"
+    ]
+    
+    # Look for company names after working at/with/for or near dates with improved context
+    # 1. Company names typically follow specific prepositions (at, with, for)
+    # 2. They often have specific organizational suffixes (Inc, LLC, Ltd, Corp)
+    # 3. They usually appear in work experience or job history sections
+    company_patterns = [
+        # Pattern 1: After preposition with organizational context
+        r'(?:at|with|for)\s+([A-Z][A-Za-z0-9\s&\.,-]+?)(?:,|\.|\s+(?:as|in|from|LLC|Inc\.?|Ltd\.?|Corp\.?|Corporation|Company|Technologies|Solutions))',
+        
+        # Pattern 2: Company with organizational suffix
+        r'\b([A-Z][A-Za-z0-9\s&]+?)\s+(?:LLC|Inc\.?|Ltd\.?|Corp\.?|Corporation|Company|Technologies|Solutions)\b',
+        
+        # Pattern 3: Company after employment verbs
+        r'(?:employed|worked|hired)\s+(?:at|by|with)\s+([A-Z][A-Za-z0-9\s&\.,-]+?)(?:\s|\.|,|\n)'
+    ]
+    
+    # Extract candidates using our patterns
+    company_candidates = []
+    for pattern in company_patterns:
+        matches = re.finditer(pattern, text)
+        for match in matches:
+            company = match.group(1).strip()
+            if company and len(company) > 2 and len(company) < 40:
+                company_candidates.append(company)
+    
+    # Filter out non-company terms
+    for company in company_candidates:
+        if company not in companies:
+            # Check if it's not a common skill or technology term
+            is_non_company = False
+            company_lower = company.lower()
+            
+            for term in non_company_terms:
+                if term in company_lower or company_lower in term:
+                    is_non_company = True
+                    break
+            
+            if not is_non_company:
+                companies.append(company)
+    
+    # Limit to 5 companies
+    return companies[:5]
+
+
+# Create an alias for extract_companies to be used in fallback extraction
+extract_companies_from_text = extract_companies
+
+def parse_resume_with_retries(file_path: str, max_retries=3):
+    """Parse resume with retry mechanism for better handling of critical fields"""
+    raw_text = None
+    response_text = None
+    parsed_data = None
+    retry_count = 0
+    resume_id = os.path.basename(file_path).split('.')[0]
+    
+    # Extract the raw text from the resume file for debugging and retries
+    try:
+        # Get raw text based on file extension
+        file_ext = os.path.splitext(file_path)[1].lower()
+        if file_ext == '.pdf':
+            raw_text = extract_text_from_pdf(file_path)
+        elif file_ext in ['.doc', '.docx']:
+            raw_text = extract_text_from_docx(file_path)
+        else:
+            # For other file types, try to read as text
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                raw_text = f.read()
+                
+        if not raw_text:
+            safe_log(f"Failed to extract text from {file_path}", level='error')
+            return None
+    except Exception as e:
+        safe_log(f"Error extracting text from {file_path}: {str(e)}", level='error')
+        return None
+    
+    # Initial parsing attempt
+    parsed_data = parse_resume(file_path)
+    
+    # Track the LLM response for debugging
+    last_response = None
+    
+    # If initial parsing succeeded, validate the data
+    if parsed_data:
+        # Save the last LLM response
+        if hasattr(parsed_data, '_raw_llm_response'):
+            last_response = parsed_data._raw_llm_response
+            
+        # Validate results and check if retry is needed
+        from debug_helper import validate_parsed_data
+        is_valid, issues = validate_parsed_data(parsed_data, resume_id=resume_id)
+        
+        # If data is valid, return it directly
+        if is_valid:
+            # Save debug info for successful parse
+            if hasattr(parsed_data, '_raw_llm_response') and raw_text:
+                from debug_helper import save_llm_debug_info
+                save_llm_debug_info(
+                    raw_text, 
+                    parsed_data._raw_llm_response, 
+                    parsed_data, 
+                    resume_id=resume_id
+                )
+            return parsed_data
+    
+    # Retry logic if needed
+    while retry_count < max_retries and (not parsed_data or not is_valid):
+        retry_count += 1
+        safe_log(f"Retry #{retry_count} for {file_path} due to issues: {issues}", level='warning')
+        
+        # Create a more detailed prompt for retries
+        enhanced_prompt = RESUME_PARSING_PROMPT + f"""
+        
+ATTENTION - THIS IS A RETRY ATTEMPT #{retry_count}.
+The previous parsing attempt failed to extract the following critical information:
+{', '.join(issues)}
+
+Please explicitly focus on:
+1. Calculating total_years_experience accurately by summing all work durations
+2. Extracting all education details including degree and institution
+3. Inferring industries from the work experience and company descriptions
+4. Identifying all project information associated with each company
+5. For address, include ANY geographical information found - city, state, country, etc.
+
+VERY IMPORTANT: Never return empty arrays or 'Not provided' for critical fields unless absolutely no information exists in the resume.
+If you see any partial information, include it rather than returning 'Not provided'.
+"""
+        
+        # Call LLM with enhanced prompt
+        prompt = enhanced_prompt + f"\n\nUSER: Parse this resume:\n\n{raw_text}\n\nASSISTANT:\n"
+        response = call_llm(prompt, raw_text=raw_text, file_path=file_path)
+        
+        if response:
+            last_response = response
+            # Extract JSON from response
+            json_str = extract_json_from_llm_response(response)
+            
+            if json_str:
+                try:
+                    parsed_data = json.loads(json_str)
+                    
+                    # Attach raw response for debugging
+                    parsed_data['_raw_llm_response'] = response
+                    
+                    # Validate the retry results
+                    is_valid, issues = validate_parsed_data(parsed_data, resume_id=resume_id)
+                    
+                    # If valid, break out of retry loop
+                    if is_valid:
+                        safe_log(f"Successful parse after {retry_count} retries for {file_path}", level='info')
+                        break
+                        
+                except Exception as e:
+                    safe_log(f"JSON parsing error in retry #{retry_count}: {str(e)}", level='error')
+            else:
+                safe_log(f"Failed to extract JSON from LLM response in retry #{retry_count}", level='error')
+    
+    # Save debug info whether successful or not on final attempt
+    if raw_text and last_response:
+        from debug_helper import save_llm_debug_info
+        save_llm_debug_info(
+            raw_text, 
+            last_response, 
+            parsed_data, 
+            resume_id=resume_id, 
+            filename=f"resume_{resume_id}_retry{retry_count}"
+        )
+    
+    # Fall back to original parsing if retries didn't improve things
+    if not parsed_data:
+        safe_log(f"All retries failed for {file_path}, falling back to basic extraction", level='error')
+        parsed_data = extract_data_from_raw_text(raw_text, file_path)
+    
+    return parsed_data
+
+
+__all__ = [
+    'parse_resume',
+    'parse_resume_with_retries',
+    'extract_metadata_from_resume',
+    'extract_relevant_text_for_embeddings',
+    'call_llm',
+] 

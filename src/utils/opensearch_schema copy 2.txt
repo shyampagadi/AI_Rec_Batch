@@ -1,0 +1,74 @@
+PUT /resume-embeddings
+{
+  "settings": {
+    "index": {
+      "knn": true,
+      "knn.algo_param.ef_search": 1024
+    }
+  },
+  "mappings": {
+    "properties": {
+      "resume_id": {
+        "type": "keyword"
+      },
+      "resume_embedding": {
+        "type": "knn_vector",
+        "dimension": 1024,
+        "method": {
+          "name": "hnsw",
+          "engine": "nmslib",
+          "space_type": "cosinesimil",
+          "parameters": {
+            "ef_construction": 1024,
+            "m": 48
+          }
+        }
+      },
+      "summary": {"type": "text"},
+      "total_experience": {"type": "float"},
+      "positions": {"type": "keyword"},
+      "companies": {
+        "type": "nested",
+        "properties": {
+          "name": {"type": "keyword"},
+          "duration": {"type": "text"},
+          "description": {"type": "text"},
+          "industry": {"type": "keyword"}
+        }
+      },
+      "projects": {
+        "type": "nested",
+        "properties": {
+          "name": {"type": "text"},
+          "description": {"type": "text"},
+          "technologies": {"type": "keyword"}
+        }
+      },
+      "education": {
+        "type": "nested",
+        "properties": {
+          "degree": {"type": "text"},
+          "institution": {"type": "keyword"},
+          "year": {"type": "short"}
+        }
+      },
+      "skills": {
+        "type": "keyword",
+        "normalizer": "lowercase"
+      },
+      "industries": {"type": "keyword"},
+      "achievements": {
+        "type": "nested",
+        "properties": {
+          "company": {"type": "keyword"},
+          "description": {"type": "text"},
+          "category": {"type": "keyword"}
+        }
+      },
+      "certifications": {"type": "keyword"},
+      "collection_name": {"type": "keyword"},
+      "created_dt": {"type": "date"},
+      "updated_dt": {"type": "date"}
+    }
+  }
+}
